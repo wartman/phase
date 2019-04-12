@@ -1,0 +1,10 @@
+package Test::Language::Pipes {
+
+  var foo = "FOO.BAR"
+    |> strtolower()
+    |> explode('.')
+    |> implode('+')
+
+  ::Expect.that(foo, 'foo+bar')
+
+}

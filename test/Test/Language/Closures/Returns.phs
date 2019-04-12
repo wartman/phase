@@ -1,0 +1,11 @@
+package Test::Language::Closures {
+
+  var defaultReturn = { |foo|
+    return foo
+  }
+  var autoReturn = { |foo| foo }
+
+  ::Expect.that(defaultReturn('foo'), 'foo')
+  ::Expect.that(autoReturn('foo'), 'foo')
+
+}

@@ -1,0 +1,16 @@
+package Test::Language::Closures {
+
+  var foo = 'foo'
+  
+  var captures = {
+    var bar = 'bar'
+    var one = { |thing| thing +++ foo }
+    var two = { 
+      return { one(bar) } 
+    }
+    return two()
+  }
+
+  ::Expect.that(captures(), 'foobar')
+
+}

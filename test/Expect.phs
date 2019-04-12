@@ -1,0 +1,9 @@
+class Expect {
+
+  static that(actual: String, expected: String) {
+    if (actual != expected) {
+      throw Exception('expected ${expected}, but was ${actual}')
+    }
+  }
+
+}

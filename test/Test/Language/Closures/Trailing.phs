@@ -1,0 +1,7 @@
+package Test::Language::Closures {
+
+  var hasTrailing = { |b| b() }
+  
+  ::Expect.that(hasTrailing { 'foo' }, 'foo')
+
+}

@@ -1,0 +1,166 @@
+package My::Test {
+
+  use Foo::Bin as Bar
+  use My::Annotation::{ Cool, Beans }
+  use ::OtherTest
+
+  function main() {
+    var foo = 'foo'
+    var dict = [
+      1: 'one',
+      foo: 'bar',
+      "bar": 'bin'
+    ]
+    var bin = { |val, bar| val +++ foo }
+
+    // Closures should capture vars:
+    var baf = {
+      var extra = 'ok!'
+      var foob = { |thing| bin(thing) +++ extra }
+      foob('bar')
+    }
+
+    var i = 0
+    while (i < 12) {
+      i++; print(i) // just to show it can be done
+    }
+    
+    var strs = "You" +++ "join strings"
+      +++ "like this"
+    var interp = "
+      That's annoying though, so you can just use
+      interpolation instead and do this: ${strs}
+    "
+    var escaped = 'this is "ok" so'
+
+    if (foo == 'foo') {
+      print(bin('a'))
+      gaf('er')
+      print(foo)
+    }
+
+    // You can pipe methods too! The previous value
+    // will be piped into the last param of the target method
+    // or lambda. This happens to match up with most of PHP's 
+    // functions, which is neat. If you need to inject a param
+    // elsewhere, however, you can use Lambdas (see below).
+    var foo = "bar.bin" 
+      |> strtolower()
+      |> trim()
+      // If you need to change the location of the param you're
+      // piping to, you can just use a Lambda! `it` is the default
+      // name of the variable if none is provided.
+      |> { str_replace('bin', 'bar', it) }
+      |> explode('.')
+      // array_map here is using a trailing lambda!
+      |> array_map { it +++ 'foo' }
+      |> implode('+')
+  }
+
+  function gaf(value) {
+    print(value)
+  }
+
+  interface Barable {
+    getBin()
+  }
+
+  trait HasThings {
+
+    getThings() { 'things' }
+
+  }
+
+  @Cool( type = 'sure is' )
+  @Beans(
+    forEvery = 'meal',
+    isPublic = false
+  )
+  class MyBar 
+    extends Bar
+    implements OtherTest
+    implements Barable
+  {
+    
+    use HasThings
+    use ::Foo::Bin::Bar
+
+    foo: String
+    static bin = []
+    static private bar = 'bar'
+
+    static foob(thing: String = 'ok') {
+      return static.bin +++ thing
+    }
+
+    new(foo: String) {
+      super.new()
+      this.foo.bar = foo
+      main()
+    }
+
+    @Beans
+    private getYo() { 
+      return (
+        1 + 
+          (2 
+            + 3)
+      )
+    }
+
+    getBin() {
+      this
+        .foo()
+
+      static
+        .foob()['foo'] = 'bar'
+
+      static.foob {
+        it.is  .automatically
+
+          // WHITESPACE
+
+            .provided
+        return 'trailing lambdas are neat'
+      }
+      
+      return static
+        .foob()
+        .barf()
+        .bif
+        .foob()
+        .bin['foo'] = 'bar'
+    }
+
+    tryFor() {
+      var numbers = [ 1, 2, 3 ]
+      for (number in numbers) {
+        print(number)
+      }
+
+      for (i in 0..3) {
+        print(i)
+      }
+
+      var items = [
+        'a': 'b',
+        'c': 'd'
+      ]
+
+      for (key: value in items) {
+        print(key);
+        print('this ${value} is a thing');
+      }
+
+      try {
+        thing()
+      } catch(e: ::Exception) {
+        print(e)
+      }
+    }
+
+  }
+
+  var bin = MyBar()
+
+}
