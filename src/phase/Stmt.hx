@@ -61,14 +61,25 @@ class For implements Stmt {
   var body:Stmt;
 }
 
-class Block implements Stmt {
-  var statements:Array<Stmt>;
-}
-
 class If implements Stmt {
   var condition:Expr;
   var thenBranch:Stmt;
   var elseBranch:Stmt;
+}
+
+typedef SwitchCase = {
+  condition:Expr,
+  body:Array<Stmt>,
+  isDefault:Bool
+};
+
+class Switch implements Stmt {
+  var target:Expr;
+  var cases:Array<SwitchCase>;
+}
+
+class Block implements Stmt {
+  var statements:Array<Stmt>;
 }
 
 typedef FunctionArg = {
@@ -101,6 +112,7 @@ enum FieldAccess {
   APublic;
   APrivate;
   AAbstract;
+  AConst;
 }
 
 class Field implements Stmt {

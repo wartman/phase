@@ -56,7 +56,7 @@ class PhpGenerator
     this.reporter = reporter;
 
     if (this.options.annotation == null) {
-      this.options.annotation = AnnotatePhase;
+      this.options.annotation = AnnotateDocblock;
     }
   }
 
@@ -215,14 +215,20 @@ class PhpGenerator
   }
   
   public function visitFieldStmt(stmt:Stmt.Field):String {
+    var isConst:Bool = false;
     return '\n' + getIndent() + stmt.access.map(a -> switch a {
       case AStatic: 'static';
       case APublic: 'public';
       case APrivate: 'protected';
+      case AConst: 
+        isConst = true;
+        'const';
       case AAbstract: mode == GeneratingInterface ? null : 'abstract';
     }).filter(f -> f != null).join(' ') + switch stmt.kind {
       case FVar(v, _):
-        var out = ' $' + safeVar(stmt.name);
+        var out = isConst 
+          ? ' ' + safeVar(stmt.name)
+          : ' $' + safeVar(stmt.name);
         if (v.initializer != null) {
           out += ' = ' + generateExpr(v.initializer);
         }
@@ -344,11 +350,35 @@ class PhpGenerator
     }
   }
 
+  public function visitSwitchStmt(stmt:Stmt.Switch):String {
+    var out = getIndent() + 'switch (' + generateExpr(stmt.target) + ')\n' + getIndent() + '{\n';
+    indent();
+    for (c in stmt.cases) {
+      if (c.isDefault) {
+        out += getIndent() + 'default:\n';
+      } else {
+        out += getIndent() + 'case ' + generateExpr(c.condition) + ':\n';
+      }
+      indent();
+      out += c.body.map(generateStmt).join('') + '\n';
+      out += getIndent() + 'break;\n';
+      outdent();
+    }
+    outdent();
+    out += getIndent() + '}';
+    return out;
+  }
+
   public function visitAnnotationExpr(expr:Expr.Annotation):String {
     var name = expr.path.map(t -> t.lexeme).join('\\');
     return switch options.annotation {
       case AnnotateDocblock: 
-        '@' + name + '(' + generateList(expr.params) + ')';
+        '@' + name + '('  + expr.params.map(param -> switch param.getClass() {
+          case Expr.Assign:
+            var assign:Expr.Assign = cast param;
+            '${assign.name.lexeme} = ${generateExpr(assign.value)}';
+          default: generateExpr(param);
+        }).join(', ') + ')';
       case AnnotatePhase:
         'new ' + name + '([' + expr.params.map(param -> switch param.getClass() {
           case Expr.Assign:
@@ -415,7 +445,10 @@ class PhpGenerator
   public function visitGetExpr(expr:Expr.Get):String {
     return switch expr.object.getClass() {
       case Expr.Type | Expr.Static:
-        generateExpr(expr.object) + '::$' + safeVar(expr.name);
+        generateExpr(expr.object) + '::' + switch expr.name.type {
+          case TokTypeIdentifier: safeVar(expr.name);
+          default: '$' + safeVar(expr.name);
+        } 
       default: 
         generateExpr(expr.object) + '->' + safeVar(expr.name);
     }
@@ -424,7 +457,10 @@ class PhpGenerator
   public function visitSetExpr(expr:Expr.Set):String {
     var left = switch expr.object.getClass() {
       case Expr.Type | Expr.Static: 
-        generateExpr(expr.object) + '::$' + safeVar(expr.name);
+        generateExpr(expr.object) + '::' + switch expr.name.type {
+          case TokTypeIdentifier: safeVar(expr.name);
+          default: '$' + safeVar(expr.name);
+        } 
       default: 
         generateExpr(expr.object) + '->' + safeVar(expr.name);
     }
@@ -490,6 +526,8 @@ class PhpGenerator
       expr.value;
     else if (Std.is(expr.value, Bool))
       expr.value;
+    else if (expr.value == null)
+      return 'null';
     else {
       var value:String = expr.value;
       '"' + value.replace('"', '\\"') + '"'; // todo: escape strings

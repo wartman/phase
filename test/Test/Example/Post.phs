@@ -1,0 +1,29 @@
+package Test::Example {
+
+  use Doctrine::ORM::Annotation::{
+    Entity,
+    Id,
+    Column,
+    GeneratedValue
+  }
+
+  /// An example of how Phase might work with something
+  /// like Doctrine. 
+  @Entity()
+  class Post {
+    
+    @Id()
+    @Column(type="integer")
+    @GeneratedValue()
+    id: Int
+
+    @Id()
+    @Column(type="string")
+    name: String
+
+    @Column(type="integer")
+    date: Int
+
+  }
+
+}

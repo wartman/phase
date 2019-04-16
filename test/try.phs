@@ -72,7 +72,7 @@ package My::Test {
   }
 
   @Cool( type = 'sure is' )
-  @Beans(
+  @Beans::Thing(
     forEvery = 'meal',
     isPublic = false
   )
@@ -85,12 +85,13 @@ package My::Test {
     use HasThings
     use ::Foo::Bin::Bar
 
+    const BIG = 'BIG'
     foo: String
     static bin = []
     static private bar = 'bar'
 
     static foob(thing: String = 'ok') {
-      return static.bin +++ thing
+      return static.bin +++ static.BIG
     }
 
     new(foo: String) {
@@ -157,6 +158,13 @@ package My::Test {
       } catch(e: ::Exception) {
         print(e)
       }
+
+      switch ('foo') {
+        case 'foo': print('ok')
+        default: 
+          print('not ok')
+      }
+
     }
 
   }

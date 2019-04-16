@@ -1,0 +1,7 @@
+package Phase::Language {
+
+  interface Expr {
+    accept(visitor:ExprVisitor);
+  }
+
+}

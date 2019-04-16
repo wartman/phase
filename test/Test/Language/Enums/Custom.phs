@@ -1,0 +1,11 @@
+package Test::Language::Enums {
+
+  enum Custom {
+    Foo = 'Foo'
+    Bar = 'Bar'
+  }
+
+  ::Expect.that(Custom.Foo, 'Foo')
+  ::Expect.that(Custom.Bar, 'Bar')
+
+}

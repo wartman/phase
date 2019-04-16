@@ -20,11 +20,17 @@ class Compiler {
   }
 
   public function compile() {
-    var modules = compileDir();
-    writeModules(modules);
+    try {
+      var modules = compileDir();
+      writeModules(modules); 
+    } catch (e:PhpGenerator.GeneratorError) {
+      trace('Compiling failed');
+    }
   }
 
-  // Todo: this code is a mess. Come up with something less brittle.
+  // Todo: this loding code is a mess. Come up with something less brittle.
+  //       Mostly this is to do with the wild way i decided to iterate
+  //       over files.
   function compileDir(?dir:String, ?modules:Map<String, String>):Map<String, String> {
     var fullPath = dir != null ? Path.join([ src, dir ]) : src;
     if (modules == null) modules = new Map(); 
@@ -45,18 +51,17 @@ class Compiler {
 
   function compileFile(path:String) {
     var source = load(path);
-    var reporter = this.reporterFactory(source);
+    var reporter = reporterFactory(source);
     var scanner = new Scanner(source, path, reporter);
     var parser = new Parser(scanner.scan(), reporter);
     var generator = new PhpGenerator(parser.parse(), reporter);
     
-    try {
-      return generator.generate();
-    } catch (e:PhpGenerator.GeneratorError) {
-      throw 'Compiling failed';
+    var data = generator.generate();
+    if (reporter.hadError()) {
+      throw new PhpGenerator.GeneratorError();
+      return '';
     }
-
-    return '';
+    return data;
   }
 
   function writeModules(modules:Map<String, String>) {

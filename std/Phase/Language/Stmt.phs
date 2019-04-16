@@ -1,0 +1,7 @@
+package Phase::Language {
+
+  interface Stmt {
+    accept(visitor:StmtVisitor)
+  }
+
+}

@@ -1,0 +1,95 @@
+package Phase::Language {
+
+  enum TokenType {
+
+    TokAt = '@'
+    TokSharp = '#'
+    TokLeftParen = '('
+    TokRightParen = ')'
+    TokLeftBrace = '{'
+    TokRightBrace = '}'
+    TokLeftBracket = '['
+    TokRightBracket = ']'
+    TokBar = '|'
+    TokComma = ','
+    TokDot = '.'
+    TokMinus = '-'
+    TokMinusMinus = '-'
+    TokPlus = '+'
+    TokPlusPlus = '++'
+    TokPlusEqual = '+='
+    TokColon = ':'
+    TokSemicolon = ''
+    TokNewline = '[newline]'
+    TokSlash = '\\'
+    TokStar = '*'
+    TokAnd = '&'
+    TokBoolAnd = '&&'
+    TokBoolOr = '||'
+    TokScopeResolutionOperator = '::'
+    TokBang = '!'
+    TokBangEqual = '!='
+    TokEqual = '='
+    TokBoolEqual = '=='
+    TokGreater = '>'
+    TokGreaterEqual = '>='
+    TokLess = '<'
+    TokLessEqual = '<='
+    TokRange = '...'
+    TokConcat = '+++'
+    TokPipe = '|>'
+
+    TokClass = 'class'
+    TokInterface = 'interface'
+    TokTrait = 'trait'
+    TokExtends = 'extends'
+    TokImplements = 'implements'
+    TokEnum = 'enum'
+    TokStatic = 'static'
+    TokPrivate = 'private'
+    TokPublic = 'public'
+    TokAbstract = 'abstract'
+    TokConst = 'const'
+    TokFalse = 'false'
+    TokTrue = 'true'
+    TokElse = 'else'
+    TokFunction = 'function'
+    TokFor = 'for'
+    TokIf = 'if'
+    TokNull = 'null'
+    TokReturn = 'return'
+    TokSuper = 'super'
+    TokThis = 'this'
+    TokVar = 'var'
+    TokWhile = 'while'
+    TokUse = 'use'
+    TokPackage = 'package'
+    TokAs = 'as'
+    TokIn = 'in'
+    TokThrow = 'throw'
+    TokTry = 'try'
+    TokCatch = 'catch'
+    TokSwitch = 'switch'
+    TokCatch = 'catch'
+    TokDefault = 'default'
+
+    TokIdentifier = '[identifier]'
+    TokTypeIdentifier = '[type-identifier]'
+    TokString = '[string]'
+    TokNumber = '[number]'
+  
+    // Interpolated strings, like `"foo ${bar}"`, are parsed
+    // as if they were written `"foo" ++ bar`. For example, the
+    // token stream for `"foo ${bar} bin"` would look like:
+    // 
+    //  Interpolation // -> "foo"
+    //  Identifier // -> bar
+    //  String // -> "bin"
+    //
+    TokInterpolation = '[interpolation]'
+
+    TokEof = '[eof]'
+    
+  }
+
+}

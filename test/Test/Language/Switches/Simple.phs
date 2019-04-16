@@ -1,0 +1,19 @@
+package Test::Language::Switches {
+
+  var foo = 'foo'
+  var result
+
+  switch (foo) {
+    case 'bar':
+      result = 'bar'
+    case 'bin':
+      result = 'bin'
+    case 'foo':
+      result = 'foo'
+    default:
+      result = 'default'
+  }
+
+  ::Expect.that(foo, 'foo')
+
+}

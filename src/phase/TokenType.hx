@@ -49,6 +49,7 @@ enum abstract TokenType(String) to String {
   var TokPrivate = 'private';
   var TokPublic = 'public';
   var TokAbstract = 'abstract';
+  var TokConst = 'const';
   var TokFalse = 'false';
   var TokTrue = 'true';
   var TokElse = 'else';
@@ -68,6 +69,9 @@ enum abstract TokenType(String) to String {
   var TokThrow = 'throw';
   var TokTry = 'try';
   var TokCatch = 'catch';
+  var TokSwitch = 'switch';
+  var TokCase = 'case';
+  var TokDefault = 'default';
 
   var TokIdentifier = '[identifier]';
   var TokTypeIdentifier = '[type-identifier]'; // An identifier that starts upper-case.

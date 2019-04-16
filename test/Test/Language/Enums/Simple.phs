@@ -1,0 +1,9 @@
+package Test::Language::Enums {
+
+  // Showing off the compact syntax:
+  enum Simple { Foo; Bar }
+
+  ::Expect.that(Simple.Foo, 0)
+  ::Expect.that(Simple.Bar, 1)
+
+}

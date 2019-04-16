@@ -8,6 +8,7 @@ class Scanner {
     TokClass => TokClass,
     TokInterface => TokInterface,
     TokTrait => TokTrait,
+    TokEnum => TokEnum,
     TokExtends => TokExtends,
     TokImplements => TokImplements,
     TokEnum => TokEnum,
@@ -15,6 +16,7 @@ class Scanner {
     TokPrivate => TokPrivate,
     TokPublic => TokPublic,
     TokAbstract => TokAbstract,
+    TokConst => TokConst,
     TokFalse => TokFalse,
     TokTrue => TokTrue,
     TokElse => TokElse,
@@ -33,7 +35,10 @@ class Scanner {
     TokIn => TokIn,
     TokThrow => TokThrow,
     TokTry => TokTry,
-    TokCatch => TokCatch
+    TokCatch => TokCatch,
+    TokSwitch => TokSwitch,
+    TokCase => TokCase,
+    TokDefault => TokDefault
   ];
 
   var file:String;

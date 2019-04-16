@@ -50,7 +50,7 @@ class Parser {
         return varDeclaration();
       }
       if (match([ TokFunction ])) return functionDeclaration(false, annotation);
-      // if (match([ TokEnum ])) return enumDeclaration();
+      if (match([ TokEnum ])) return enumDeclaration(annotation);
       if (match([ TokInterface ])) return interfaceDeclaration(annotation);
       if (match([ TokTrait ])) return traitDeclaration(annotation);
       if (match([ TokClass ])) return classDeclaration(annotation);
@@ -67,6 +67,7 @@ class Parser {
     if (match([ TokIf ])) return ifStatement();
     if (match([ TokWhile ])) return whileStatement();
     if (match([ TokFor ])) return forStatement();
+    if (match([ TokSwitch ])) return switchStatement();
     if (match([ TokReturn ])) return returnStatement();
     if (match([ TokThrow ])) return throwStatement();
     if (match([ TokTry ])) return tryStatement();
@@ -119,6 +120,7 @@ class Parser {
         kind = UseSub(parseList(TokComma, () -> {
           consume(TokTypeIdentifier, 'Expect a list type identifier');
         }));
+        ignoreNewlines();
         consume(TokRightBrace, "Expect a '}'.");
         break;
       } else {
@@ -166,6 +168,7 @@ class Parser {
     var params:Array<Stmt.FunctionArg> = [];
     if (!check(TokRightParen)) {
       do {
+        ignoreNewlines();
         var name = consume(TokIdentifier, 'Expect parameter name');
         var type = typeHint();
         var expr:Expr = null;
@@ -179,6 +182,7 @@ class Parser {
         });
       } while(match([ TokComma ]));
     }
+    ignoreNewlines();
     consume(TokRightParen, 'Expect \')\' after parameters');
     return params; 
   }
@@ -247,6 +251,39 @@ class Parser {
     return new Stmt.Class(name, KindTrait, null, [], fields, annotation);
   }
 
+  function enumDeclaration(annotation:Array<Expr>) {
+    var name = consume(TokTypeIdentifier, 'Expect an enum name. Must start uppercase.');
+    var fields:Array<Stmt.Field> = [];
+
+    consume(TokLeftBrace, "Expect '{' before trait body.");
+    ignoreNewlines();
+    
+    var index = 0;
+    while (!check(TokRightBrace) && !isAtEnd()) {
+      ignoreNewlines();
+      var fieldName = consume(TokTypeIdentifier, "Expect an uppercase identifier");
+      var value = if (match([ TokEqual ])) {
+        expression();
+      } else {
+        new Expr.Literal(index);
+      }
+      index++;
+      expectEndOfStatement();
+      fields.push(new Stmt.Field(
+        fieldName,
+        FVar(new Stmt.Var(fieldName, value), null),
+        [ AConst ],
+        []
+      ));
+    }
+
+    ignoreNewlines();
+    consume(TokRightBrace, "Expect '}' at end of trait body");
+    ignoreNewlines();
+  
+    return new Stmt.Class(name, KindClass, null, [], fields, annotation);
+  }
+
   function classDeclaration(annotation:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a class name. Must start uppercase.');
     var superclass:Token = null;
@@ -293,6 +330,21 @@ class Parser {
         previous(),
         FUse(parseTypePath()),
         [],
+        []
+      );
+      expectEndOfStatement();
+      return out;
+    }
+
+    if (match([ TokConst ])) {
+      var name = consume(TokTypeIdentifier, 'Expect uppercase identifier');
+      ignoreNewlines();
+      consume(TokEqual, 'Expect assignment for consts');
+      var value = expression();
+      var out = new Stmt.Field(
+        name,
+        FVar(new Stmt.Var(name, value), null),
+        [ AConst ],
         []
       );
       expectEndOfStatement();
@@ -473,6 +525,57 @@ class Parser {
     consume(TokRightParen, "Expect ')'");
     var body = statement();
     return new Stmt.For(key, value, target, body);
+  }
+
+  function switchStatement() {
+    consume(TokLeftParen, "Expect '(' after 'switch'.");
+    ignoreNewlines();
+    var target = expression();
+    ignoreNewlines();
+    consume(TokRightParen, "Expect ')' after switch target");
+    ignoreNewlines();
+    consume(TokLeftBrace, "Expect '{'");
+    ignoreNewlines();
+    
+    var cases:Array<Stmt.SwitchCase> = [];
+    
+    while(!isAtEnd() && match([ TokCase, TokDefault ])) {
+      ignoreNewlines();
+      var condition:Expr = null;
+      var isDefault = false;
+      
+      if (previous().type == TokDefault) {
+        isDefault = true;
+      } else {
+        condition = expression();
+      }
+
+      // todo: handle '|'
+      consume(TokColon, "Expect a ':' after case condition");
+      ignoreNewlines();
+
+      var body:Array<Stmt> = [];
+      while(
+        !isAtEnd() 
+        && !check(TokCase) 
+        && !check(TokDefault)
+        && !check(TokRightBrace)
+      ) {
+        body.push(statement());
+      }
+
+      cases.push({
+        condition: condition,
+        body: body,
+        isDefault: isDefault
+      });
+    }
+
+    ignoreNewlines();
+    consume(TokRightBrace, "Expect a '}' at the end of switch statement");
+    ignoreNewlines();
+
+    return new Stmt.Switch(target, cases);
   }
 
   private function returnStatement():Stmt {
@@ -681,7 +784,11 @@ class Parser {
         expr = new Expr.Call(expr, previous(), [ shortLambda(!check(TokNewline)) ]);
       } else if (match([ TokDot ])) {
         ignoreNewlines();
-        var name = consume(TokIdentifier, "Expect property name after '.'.");
+        var name = if (match([ TokTypeIdentifier ])) {
+          previous();
+        } else {
+          consume(TokIdentifier, "Expect property name after '.'.");
+        }
         expr = new Expr.Get(expr, name);
       } else if (match([ TokLeftBracket ])) {
         ignoreNewlines();
