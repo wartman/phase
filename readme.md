@@ -70,7 +70,7 @@ Let's start with an overly complex example. Note the `| item |` -- this is where
 
 ```phase
 var addFoo = { |item|
-  return '${it} foo'
+  return '${item} foo'
 }
 print(addFoo('bar')) // => 'bar foo'  
 ```
@@ -83,7 +83,7 @@ We only have one expression in this lambda, and we actually don't need the `retu
 Thus:
 
 ```phase
-var addFoo = { |item| '${it} foo' }
+var addFoo = { |item| '${item} foo' }
 print(addFoo('bar')) // => 'bar foo'  
 ```
 
