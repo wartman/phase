@@ -153,7 +153,6 @@ var example = { |a, b| a +++ b }
 
 "FOO.BAR"
   |> explode('.')
-  |> array_map { it |> stringtolower() }
-  |> { example(it, ".foo") }
-  |> implode('+') // => 'foo.foo+bar.foo'
+  |> implode('+')
+  |> { example(it, ".foo") }  // => 'foo+bar.foo'
 ```
