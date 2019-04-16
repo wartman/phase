@@ -41,13 +41,15 @@ class VisualErrorReporter implements ErrorReporter {
       curLine++;
     } while (curLine < line);
 
-    var spaces = '    | ' + [for (i in 0...start) ' '].join('');
+    var spaces = '      | ' + [for (i in 0...start) ' '].join('');
     var markers = spaces + [for (i in 0...end) '^'].join('');
     out.push(markers);
     out.push(spaces + message);
 
     do {
-      out.push(formatLine(curLine) + lines[curLine]);
+      var content = lines[curLine];
+      if (content == null) content = '';
+      out.push(formatLine(curLine) + content);
       curLine++;
     } while (curLine < limit);
 
@@ -58,8 +60,10 @@ class VisualErrorReporter implements ErrorReporter {
 
   function formatLine(curLine:Int) {
     var line = Std.string(curLine + 1);
-    if (line.length == 1) return '  ${line} | ';
-    if (line.length == 2) return ' ${line} | ';
+    if (line.length == 1) return '    ${line} | ';
+    if (line.length == 2) return '   ${line} | ';
+    if (line.length == 3) return '  ${line} | ';
+    if (line.length == 4) return ' ${line} | ';
     return '${line} | ';
   }
 

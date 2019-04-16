@@ -23,8 +23,9 @@ class Compiler {
     try {
       var modules = compileDir();
       writeModules(modules); 
+      Sys.println('Compiled:\n' + [ for (k in  modules.keys()) '- ' + k].join('\n'));
     } catch (e:PhpGenerator.GeneratorError) {
-      trace('Compiling failed');
+      Sys.println('Compiling failed');
     }
   }
 

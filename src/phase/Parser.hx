@@ -919,7 +919,8 @@ class Parser {
       return new Expr.Lambda(functionDef(true));
     }
 
-    throw error(peek(), 'Expect expression');
+    var tok = peek();
+    throw error(tok, 'Unexpected ${tok.type}');
   }
 
   function arrayOrAssocLiteral():Expr {
@@ -1064,10 +1065,11 @@ class Parser {
     advance();
     while (!isAtEnd()) {
       if (previous().type == TokSemicolon) return;
+      if (previous().type == TokNewline) return;
 
       switch (peek().type) {
         case TokClass | TokFunction | TokVar | TokFor | TokIf |
-             TokWhile | TokReturn: return;
+             TokWhile | TokSwitch | TokReturn: return;
         default: advance();
       }
     }
@@ -1132,9 +1134,7 @@ class Parser {
 
   function consume(type:TokenType, message:String) {
     if (check(type)) return advance();
-    // Sorta hacky, but makes error messages more useful.
-    var tok = peek().type == TokNewline ? previous() : peek();
-    throw error(tok, message);
+    throw error(previous(), message);
   }
 
   function check(type:TokenType):Bool {
