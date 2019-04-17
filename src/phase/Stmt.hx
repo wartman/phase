@@ -9,10 +9,15 @@ class Expression implements Stmt {
   var expression:Expr;
 }
 
+enum UseTarget {
+  TargetType(name:Token);
+  TargetFunction(name:Token);
+}
+
 enum UseKind {
   UseNormal;
-  UseAlias(alias:Token);
-  UseSub(items:Array<Token>);
+  UseAlias(alias:UseTarget);
+  UseSub(items:Array<UseTarget>);
 }
 
 class Use implements Stmt {
@@ -85,7 +90,8 @@ class Block implements Stmt {
 typedef FunctionArg = {
   name:Token,
   type:Null<Expr.Type>,
-  expr:Null<Expr>
+  expr:Null<Expr>,
+  ?isInit:Bool
 };
 
 class Function implements Stmt {

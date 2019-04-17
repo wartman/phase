@@ -120,7 +120,7 @@ class PhpGenerator
   public function visitIfStmt(stmt:Stmt.If):String {
     var out = getIndent() + 'if (' + generateExpr(stmt.condition) + ')\n' + generateStmt(stmt.thenBranch);
     if (stmt.elseBranch != null) {
-      out += ' else ' + generateStmt(stmt.elseBranch);
+      out += '\n' + getIndent() + 'else\n' + generateStmt(stmt.elseBranch);
     }
     return out;
   }
@@ -142,17 +142,29 @@ class PhpGenerator
     // todo: handle annotations
     var path = stmt.path.map(t -> t.lexeme).join('\\');
     if (stmt.absolute) path = '\\' + path;
+
+  
+
     return switch stmt.kind {
       case UseNormal:
         var name = stmt.path[stmt.path.length - 1].lexeme;
         scope.define(name, PhpType);
         getIndent() + 'use $path;';
-      case UseAlias(alias):
-        scope.define(alias.lexeme, PhpType);
-        getIndent() + 'use $path as ${alias.lexeme};';
-      case UseSub(items): items.map(f -> {
-        scope.define(f.lexeme, PhpType);
-        getIndent() + 'use $path\\${f.lexeme};';
+      case UseAlias(target): switch target {
+        case TargetFunction(alias):
+          scope.define(alias.lexeme, PhpFun);
+          getIndent() + 'use function $path as ${alias.lexeme};';
+        case TargetType(alias):
+          scope.define(alias.lexeme, PhpType);
+          getIndent() + 'use $path as ${alias.lexeme};';
+      }
+      case UseSub(items): items.map(target -> switch target {
+        case TargetFunction(f):
+          scope.define(f.lexeme, PhpFun);
+          getIndent() + 'use function $path\\${f.lexeme};';
+        case TargetType(f):
+          scope.define(f.lexeme, PhpType);
+          getIndent() + 'use $path\\${f.lexeme};';
       }).join('\n');
     }
   }
@@ -243,8 +255,21 @@ class PhpGenerator
         scope.push();
 
         var out = ' function ' + name + '(' + functionParams(fun.params) + ')';
+
         if (stmt.access.indexOf(AAbstract) < 0) {
-          out += '\n' + generateStmt(fun.body);
+          var body:Stmt.Block = cast fun.body; 
+          
+          // Handle initializers
+          for (p in fun.params) {
+            if (p.isInit == true) {
+              var init = new Stmt.Expression(
+                new Expr.Set(new Expr.This(p.name), p.name, new Expr.Variable(p.name))
+              );
+              body.statements.unshift(init);
+            }
+          }
+
+          out += '\n' + generateStmt(body);
         } else {
           out += ';';
         }

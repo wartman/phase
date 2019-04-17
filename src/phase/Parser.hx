@@ -114,22 +114,53 @@ class Parser {
 
     do {
       ignoreNewlines();
-      if (match([TokTypeIdentifier])) {
+      if (match([ TokTypeIdentifier ])) {
         path.push(previous());
+      } else if(match([ TokIdentifier ])) {
+        // Is a function -- only allowed at the end.
+        kind = UseSub([ TargetFunction(previous()) ]);
+        if (match([ TokScopeResolutionOperator ])) {
+          throw error(previous(), "Lowercase identifiers may only come at the end of a use statement.");
+        }
+        break;
       } else if (match([ TokLeftBrace ])) {
-        kind = UseSub(parseList(TokComma, () -> {
-          consume(TokTypeIdentifier, 'Expect a list type identifier');
+        kind = UseSub(parseList(TokComma, function():Stmt.UseTarget {
+          if (match([ TokTypeIdentifier, TokIdentifier ])) {
+            var tok = previous();
+            return tok.type == TokIdentifier 
+              ? TargetFunction(tok)
+              : TargetType(tok);
+          } else {
+            throw error(peek(), "Expect an identifier or a type identifier");
+            return null;
+          }
         }));
         ignoreNewlines();
         consume(TokRightBrace, "Expect a '}'.");
         break;
       } else {
-        error(previous(), "Expected a type identifier or a '{'");
+        throw error(previous(), "Expected a type identifier or a '{'");
       }
     } while (match([ TokScopeResolutionOperator ]) && !isAtEnd());
 
     if (match([ TokAs ])) {
-      kind = UseAlias(consume(TokTypeIdentifier, 'Expect a type identifier after `as`'));
+      if (match([ TokTypeIdentifier, TokIdentifier ])) {
+        var tok = previous();
+
+        switch kind {
+          case UseSub([ TargetFunction(p) ]):
+            path.push(p);
+          default:
+        }
+
+        kind = UseAlias(
+          tok.type == TokIdentifier 
+            ? TargetFunction(tok)
+            : TargetType(tok)
+        );
+      } else {
+        throw error(peek(), "Expect an identifier or a type identifier");
+      }
     }
 
     expectEndOfStatement();
@@ -164,21 +195,30 @@ class Parser {
     return new Stmt.Function(name, params, body, ret, annotations);
   }
 
-  function functionParams():Array<Stmt.FunctionArg> {
+  function functionParams(?allowInit:Bool = false):Array<Stmt.FunctionArg> {
     var params:Array<Stmt.FunctionArg> = [];
     if (!check(TokRightParen)) {
       do {
         ignoreNewlines();
+        var isInit = false;
+
+        if (allowInit && match([ TokThis ])) {
+          isInit = true;
+          consume(TokDot, "Expect a '.' after 'this'.");
+        }
+
         var name = consume(TokIdentifier, 'Expect parameter name');
         var type = typeHint();
         var expr:Expr = null;
         if (match([ TokEqual ])) {
           expr = expression();
         }
+
         params.push({
           name: name,
           type: type,
-          expr: expr
+          expr: expr,
+          isInit: isInit
         });
       } while(match([ TokComma ]));
     }
@@ -189,6 +229,11 @@ class Parser {
 
   function functionBody():Stmt {
     var body:Array<Stmt> = null;
+    
+    if (match([ TokRightBrace ])) {
+      return new Stmt.Block([]);
+    }
+
     if (!check(TokNewline) && !check(TokReturn)) {
       // Treat the next expression as a return.
       body = [ new Stmt.Return(peek(), expression()) ];
@@ -197,6 +242,7 @@ class Parser {
     } else {
       body = block();
     }
+    
     return new Stmt.Block(body);
   }
 
@@ -311,7 +357,24 @@ class Parser {
     
     while (!check(TokRightBrace) && !isAtEnd()) {
       ignoreNewlines();
-      fields.push(fieldDeclaration());
+
+      var field = fieldDeclaration();
+      fields.push(field);
+
+      // Add initializers
+      switch field.kind {
+        case FFun(func): for (a in func.params) {
+          if (a.isInit == true && !fields.exists(f -> f.name.lexeme == a.name.lexeme)) {
+            fields.push(new Stmt.Field(
+              a.name,
+              FVar(new Stmt.Var(a.name, null), a.type),
+              [ APublic ],
+              []
+            ));
+          }
+        } 
+        default:
+      }
     }
 
     ignoreNewlines();
@@ -414,9 +477,8 @@ class Parser {
     }
 
     consume(TokLeftParen, 'Expect \'(\' after function name.');
-    var params = functionParams();
+    var params = functionParams(name.lexeme == 'new');
     var ret = typeHint();
-    
     var body:Stmt = null;
     if (access.has(AAbstract)) {
       expectEndOfStatement();
@@ -495,9 +557,16 @@ class Parser {
     consume(TokRightParen, "Expect ')' after if condition.");
 
     var thenBranch = statement();
+    if (!Std.is(thenBranch, Stmt.Block)) {
+      thenBranch = new Stmt.Block([ thenBranch ]);
+    }
+    
     var elseBranch:Stmt = null;
     if (match([ TokElse ])) {
       elseBranch = statement();
+      if (!Std.is(elseBranch, Stmt.Block)) {
+        elseBranch = new Stmt.Block([ elseBranch ]);
+      }
     }
 
     return new Stmt.If(condition, thenBranch, elseBranch);
@@ -595,7 +664,7 @@ class Parser {
       statements.push(declaration());
     }
     ignoreNewlines();
-    consume(TokRightBrace, "Expect '}' after block.");
+    consume(TokRightBrace, "Expect '}' at the end of a block.");
     // ignoreNewlines();
     return statements;
   }
@@ -755,7 +824,7 @@ class Parser {
     return expr;
   }
 
-  function unary() {
+  function unary():Expr {
     if (match([ TokBang, TokMinus, TokPlusPlus, TokMinusMinus ])) {
       var op = previous();
       ignoreNewlines();
@@ -823,6 +892,29 @@ class Parser {
     }
 
     return new Expr.Call(callee, paren, arguments);
+  }
+
+  function taggedTemplate(callee:Expr):Expr {
+    var firstTok = peek();
+    var parts:Array<Expr> = [];
+    var placeholders:Array<Expr> = [];
+
+    // Note: Interpolated strings end on a `TokString`
+    if (!check(TokString)) {
+      do {
+        if (match([ TokInterpolation ])) {
+          parts.push(new Expr.Literal(previous().literal));
+        } else {
+          placeholders.push(expression());
+        }
+      } while (!check(TokString) && !isAtEnd());
+    }
+    parts.push(primary());
+
+    return new Expr.Call(callee, firstTok, [
+      new Expr.ArrayLiteral(firstTok, parts),
+      new Expr.ArrayLiteral(firstTok, placeholders)
+    ]);
   }
 
   function interpolation(expr:Expr):Expr {
@@ -896,6 +988,10 @@ class Parser {
 
     if (match([ TokIdentifier ])) {
       return new Expr.Variable(previous());
+    }
+
+    if (match([ TokTemplateTag ])) {
+      return taggedTemplate(new Expr.Variable(previous()));
     }
 
     if (match([ TokLeftParen ])) {
@@ -1134,7 +1230,7 @@ class Parser {
 
   function consume(type:TokenType, message:String) {
     if (check(type)) return advance();
-    throw error(previous(), message);
+    throw error(peek(), message);
   }
 
   function check(type:TokenType):Bool {

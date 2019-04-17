@@ -1,20 +1,12 @@
 package Phase::Language {
 
   class Position {
-   
-    line: Int
-    offset: Int
-    file: String
 
     new(
-      line: Int,
-      offset: Int,
-      file: String
-    ) {
-      this.line = line
-      this.offset = offset
-      this.file = file
-    }
+      this.line: Int,
+      this.offset: Int,
+      this.file: String
+    ) {}
 
   }
 

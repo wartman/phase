@@ -14,7 +14,7 @@ enum abstract TokenType(String) to String {
   var TokComma = ',';
   var TokDot = '.';
   var TokMinus = '-';
-  var TokMinusMinus = '-';
+  var TokMinusMinus = '--';
   var TokPlus = '+';
   var TokPlusPlus = '++';
   var TokPlusEqual = '+=';
@@ -77,6 +77,7 @@ enum abstract TokenType(String) to String {
   var TokTypeIdentifier = '[type-identifier]'; // An identifier that starts upper-case.
   var TokString = '[string]';
   var TokNumber = '[number]';
+  var TokTemplateTag = '[template]';
   
   // Interpolated strings, like `"foo ${bar}"`, are parsed
   // as if they were written `"foo" ++ bar`. For example, the

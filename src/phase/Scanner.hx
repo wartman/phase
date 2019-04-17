@@ -140,6 +140,10 @@ class Scanner {
 
     var text = source.substring(start, current);
     var type = keywords.get(text);
+
+    if ((peek() == '"' || peek() == "'") && type == null) {
+      type = TokTemplateTag;
+    }
     
     if (type != null) {
       addToken(type);

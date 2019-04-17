@@ -1,0 +1,14 @@
+package Test::Language::Packages {
+
+  // this is just testing to see if it compiles for now
+
+  use My::Type
+  use My::Classes::{ ClassA, ClassB }
+  // Lowercase identifiers resolve to functions
+  use My::Func::func
+  use My::Funcs::{ funcA, funcB }
+  use My::Mixed::{ ClassA, funcA, ClassB, funcB }
+  use My::Func::func as other
+  use My::Classes::ClassA as Thing
+
+}

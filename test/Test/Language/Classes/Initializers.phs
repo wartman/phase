@@ -1,0 +1,27 @@
+package Test::Language::Classes {
+
+  class ValueClass {
+
+    // If you need a non-public property, you
+    // must declare it
+    private bin: String
+
+    new(
+      this.foo: String,
+      this.bar: String,
+      this.bin: String
+    ) {}
+
+    getBin() {
+      return this.bin
+    }
+
+  }
+
+  var cls = ValueClass('foo', 'bar', 'bin')
+
+  ::Expect.that(cls.foo, 'foo')
+  ::Expect.that(cls.bar, 'bar')
+  ::Expect.that(cls.getBin(), 'bin')
+
+}

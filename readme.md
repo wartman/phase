@@ -37,7 +37,7 @@ Classes
 -------
 Phase's class system is basically identical to Php. The main difference is that all classes, interfaces and traits MUST start with an uppercase letter, and that (as a result) the `new` keyword is unused.
 
-```
+```phase
 class Foo {
   
   // You can define types on fields -- however, for now this does nothing and
@@ -60,6 +60,34 @@ class Foo {
 // `Foo` is not a function.
 var foo = Foo('foo')
 print(foo.foo) // => 'foo'
+```
+
+A common use of constructors is to just set a property in the class, and Phase has a simple way of doing that:
+
+```phase
+
+class Bar {
+
+  private bar: String
+
+  new(
+    // If `foo` is not an existing property, Phase will create
+    // a public property for you.
+    this.foo: String,
+    // If a property DOES exist, it will not be overwritten.
+    this.bar: String
+  ) {}
+
+  getBar() {
+    return this.bar
+  }
+
+}
+
+var bar = Bar('foo', 'bar')
+bar.foo // => 'foo'
+bar.getBar() // => 'bar'
+
 ```
 
 Lambdas
@@ -156,3 +184,5 @@ var example = { |a, b| a +++ b }
   |> implode('+')
   |> { example(it, ".foo") }  // => 'foo+bar.foo'
 ```
+
+(This is likely a place for optimization and inlining)

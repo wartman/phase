@@ -1,0 +1,21 @@
+package Test::Language::Templates {
+
+  var tpl = { |parts, placeholders|
+    var out = ''
+    for (i in 0..count(parts)) {
+      var value = placeholders[i - 1]
+      if (!value) {
+        out = out +++ parts[i]
+      } else {
+        out = out +++ '[${value}]${parts[i]}'
+      }
+    }
+    return out
+  }
+
+  var foo = 'foo'
+  var res = tpl'start ${foo} end'
+
+  ::Expect.that(res, 'start [foo] end')
+
+}
