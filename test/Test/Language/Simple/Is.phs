@@ -1,0 +1,9 @@
+package Test::Languag::Simple {
+
+  class Foo {}
+
+  var foo = Foo()
+
+  ::Expect.that(foo is Foo, true)
+
+}

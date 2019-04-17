@@ -23,6 +23,17 @@ class Binary implements Expr {
   var right:Expr;
 }
 
+class Unary implements Expr {
+  var op:Token;
+  var expr:Expr;
+  var right:Bool;
+}
+
+class Is implements Expr {
+  var left:Expr;
+  var type:Expr.Type;
+}
+
 class Logical implements Expr {
   var left:Expr;
   var op:Token;
@@ -39,13 +50,6 @@ class Call implements Expr {
   var paren:Token;
   var args:Array<Expr>;
 }
-
-// class Pipe implements Expr {
-//   var value:Expr;
-//   var op:Token;
-//   var target:Expr;
-// }
-
 class Get implements Expr {
   var object:Expr;
   var name:Token;
@@ -102,20 +106,8 @@ class AssocArrayLiteral implements Expr {
   var values:Array<Expr>;
 }
 
-// class ObjectLiteral implements Expr {
-//   var end:Token;
-//   var keys:Array<Token>;
-//   var values:Array<Expr>;
-// }
-
 class Lambda implements Expr {
   var func:Stmt;
-}
-
-class Unary implements Expr {
-  var op:Token;
-  var expr:Expr;
-  var right:Bool;
 }
 
 class Type implements Expr {

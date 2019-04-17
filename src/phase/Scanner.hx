@@ -33,6 +33,7 @@ class Scanner {
     TokPackage => TokPackage,
     TokAs => TokAs,
     TokIn => TokIn,
+    TokIs => TokIs,
     TokThrow => TokThrow,
     TokTry => TokTry,
     TokCatch => TokCatch,

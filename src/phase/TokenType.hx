@@ -66,6 +66,7 @@ enum abstract TokenType(String) to String {
   var TokPackage = 'package';
   var TokAs = 'as';
   var TokIn = 'in';
+  var TokIs = 'is';
   var TokThrow = 'throw';
   var TokTry = 'try';
   var TokCatch = 'catch';

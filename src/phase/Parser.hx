@@ -748,8 +748,14 @@ class Parser {
     return expr;
   }
 
-  function comparison() {
+  function comparison():Expr {
     var expr = addition();
+
+    if (match([ TokIs ])) {
+      var type = parseTypePath();
+      ignoreNewlines();
+      return new Expr.Is(expr, type);
+    }
 
     while (match([ TokGreater, TokGreaterEqual, TokLess, TokLessEqual ])) {
       var op = previous();

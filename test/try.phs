@@ -117,7 +117,7 @@ package My::Test {
         .foob()['foo'] = 'bar'
 
       static.foob {
-        it.is  .automatically
+        it.sureIs  .automatically
 
           // WHITESPACE
 

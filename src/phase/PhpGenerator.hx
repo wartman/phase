@@ -441,6 +441,10 @@ class PhpGenerator
     return '$' + name + ' = ${generateExpr(expr.value)}';
   }
 
+  public function visitIsExpr(expr:Expr.Is):String {
+    return generateExpr(expr.left) + ' instanceof ' + generateExpr(expr.type);
+  }
+
   public function visitBinaryExpr(expr:Expr.Binary):String {
     var op = switch expr.op.type {
       case TokConcat: '.';
