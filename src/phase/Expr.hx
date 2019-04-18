@@ -64,13 +64,13 @@ class Set implements Expr {
 class SubscriptGet implements Expr {
   var end:Token;
   var object:Expr;
-  var index:Expr;
+  var index:Null<Expr>;
 }
 
 class SubscriptSet implements Expr {
   var end:Token;
   var object:Expr;
-  var index:Expr;
+  var index:Null<Expr>;
   var value:Expr;
 }
 

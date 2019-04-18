@@ -497,11 +497,18 @@ class PhpGenerator
   }
 
   public function visitSubscriptGetExpr(expr:Expr.SubscriptGet):String {
+    if (expr.index == null) {
+      return generateExpr(expr.object) + '[]';
+    }
     return generateExpr(expr.object) + '[' + generateExpr(expr.index) + ']';
   }
 
   public function visitSubscriptSetExpr(expr:Expr.SubscriptSet):String {
-    var left = generateExpr(expr.object) + '[' + generateExpr(expr.index) + ']';
+    var left = if (expr.index == null) {
+      generateExpr(expr.object) + '[]';
+    } else { 
+      generateExpr(expr.object) + '[' + generateExpr(expr.index) + ']';
+    }
     return left + ' = ' + generateExpr(expr.value);
   }
 

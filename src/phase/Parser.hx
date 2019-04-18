@@ -866,11 +866,15 @@ class Parser {
         }
         expr = new Expr.Get(expr, name);
       } else if (match([ TokLeftBracket ])) {
-        ignoreNewlines();
-        var index = expression();
-        ignoreNewlines();
-        consume(TokRightBracket, "Expect ']' after expression");
-        expr = new Expr.SubscriptGet(previous(), expr, index);
+        if (match([ TokRightBracket ])) {
+          expr = new Expr.SubscriptGet(previous(), expr, null);
+        } else {
+          ignoreNewlines();
+          var index = expression();
+          ignoreNewlines();
+          consume(TokRightBracket, "Expect ']' after expression");
+          expr = new Expr.SubscriptGet(previous(), expr, index);
+        }
       } else {
         break;
       }
