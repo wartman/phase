@@ -1025,8 +1025,25 @@ class Parser {
       return new Expr.Lambda(functionDef(true));
     }
 
+    if (match([ TokIf ])) {
+      return ternary();
+    }
+
     var tok = peek();
     throw error(tok, 'Unexpected ${tok.type}');
+  }
+
+  function ternary():Expr {
+    consume(TokLeftParen, "Expect '(' after 'if'.");
+    var condition:Expr = expression();
+    consume(TokRightParen, "Expect ')' after if condition.");
+    ignoreNewlines();
+    var thenBranch = expression();
+    ignoreNewlines();
+    consume(TokElse, "Expected an 'else' branch");
+    ignoreNewlines();
+    var elseBranch = expression();
+    return new Expr.Ternary(condition, thenBranch, elseBranch);
   }
 
   function arrayOrAssocLiteral():Expr {

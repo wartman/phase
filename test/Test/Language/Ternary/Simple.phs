@@ -1,0 +1,6 @@
+package Test::Language::Ternary {
+  
+  var foo = if (true) 'foo' else 'bar'
+  ::Expect.that(foo, 'foo')
+
+}

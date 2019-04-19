@@ -14,7 +14,7 @@ package Phase::Language {
     TokComma = ','
     TokDot = '.'
     TokMinus = '-'
-    TokMinusMinus = '-'
+    TokMinusMinus = '--'
     TokPlus = '+'
     TokPlusPlus = '++'
     TokPlusEqual = '+='
@@ -60,36 +60,37 @@ package Phase::Language {
     TokReturn = 'return'
     TokSuper = 'super'
     TokThis = 'this'
-    TokVar = 'var'
+    Tok= 'var'
     TokWhile = 'while'
     TokUse = 'use'
     TokPackage = 'package'
     TokAs = 'as'
     TokIn = 'in'
+    TokIs = 'is'
     TokThrow = 'throw'
     TokTry = 'try'
     TokCatch = 'catch'
     TokSwitch = 'switch'
-    TokCatch = 'catch'
+    TokCase = 'case'
     TokDefault = 'default'
 
     TokIdentifier = '[identifier]'
-    TokTypeIdentifier = '[type-identifier]'
+    TokTypeIdentifier = '[type-identifier]' // An identifier that starts upper-case.
     TokString = '[string]'
     TokNumber = '[number]'
-  
+    TokTemplateTag = '[template]'
+    
     // Interpolated strings, like `"foo ${bar}"`, are parsed
     // as if they were written `"foo" ++ bar`. For example, the
     // token stream for `"foo ${bar} bin"` would look like:
     // 
-    //  Interpolation // -> "foo"
-    //  Identifier // -> bar
-    //  String // -> "bin"
+    //  TokInterpolation // -> "foo"
+    //  TokIdentifier // -> bar
+    //  TokString // -> "bin"
     //
     TokInterpolation = '[interpolation]'
 
     TokEof = '[eof]'
-    
   }
 
 }

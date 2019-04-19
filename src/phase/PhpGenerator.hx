@@ -557,6 +557,12 @@ class PhpGenerator
     return out;
   }
 
+  public function visitTernaryExpr(expr:Expr.Ternary):String {
+    return generateExpr(expr.condition) 
+      + ' ? ' + generateExpr(expr.thenBranch)
+      + ' : ' + generateExpr(expr.elseBranch);
+  }
+
   public function visitLiteralExpr(expr:Expr.Literal):String {
     return if (Std.is(expr.value, Int)) 
       expr.value;

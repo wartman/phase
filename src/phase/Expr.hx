@@ -50,6 +50,7 @@ class Call implements Expr {
   var paren:Token;
   var args:Array<Expr>;
 }
+
 class Get implements Expr {
   var object:Expr;
   var name:Token;
@@ -72,6 +73,12 @@ class SubscriptSet implements Expr {
   var object:Expr;
   var index:Null<Expr>;
   var value:Expr;
+}
+
+class Ternary implements Expr {
+  var condition:Expr;
+  var thenBranch:Expr;
+  var elseBranch:Expr;
 }
 
 class Super implements Expr {

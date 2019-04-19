@@ -1,3 +1,13 @@
 -cp src
+-lib hxnodejs
 -main Phase
--neko bin/phase.n
+
+--each
+
+-js bin/phase.js
+
+--next
+
+# For use as imports
+-D noCmd
+-js bin/phase-module.js
