@@ -1,0 +1,7 @@
+package Test::Language::Packages {
+
+  // Just checking that it compiles
+  ::Foo::Bar::Bin::foo('ok')
+  Bar::Bin::foo('ok')
+
+}

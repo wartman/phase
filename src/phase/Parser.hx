@@ -859,7 +859,7 @@ class Parser {
         expr = new Expr.Call(expr, previous(), [ shortLambda(!check(TokNewline)) ]);
       } else if (match([ TokDot ])) {
         ignoreNewlines();
-        var name = if (match([ TokTypeIdentifier ])) {
+        var name = if (match([ TokTypeIdentifier, TokClass ])) {
           previous();
         } else {
           consume(TokIdentifier, "Expect property name after '.'.");
@@ -978,22 +978,24 @@ class Parser {
     }
 
     if (match([ TokScopeResolutionOperator ])) {
-      var path = parseList(
-        TokScopeResolutionOperator, 
-        () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
-      );
-      return new Expr.Type(path, true);
+      return namespacedExprOrType(true);
+      // var path = parseList(
+      //   TokScopeResolutionOperator, 
+      //   () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
+      // );
+      // return new Expr.Type(path, true);
     }
 
-    if (match([ TokTypeIdentifier ])) {
-      var path = [ previous() ];
-      if (match([TokScopeResolutionOperator])) {
-        path = path.concat(parseList(
-          TokScopeResolutionOperator, 
-          () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
-        ));
-      }
-      return new Expr.Type(path, false);
+    if (check(TokTypeIdentifier)) {
+      return namespacedExprOrType(false);
+      // var path = [ previous() ];
+      // if (match([TokScopeResolutionOperator])) {
+      //   path = path.concat(parseList(
+      //     TokScopeResolutionOperator, 
+      //     () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
+      //   ));
+      // }
+      // return new Expr.Type(path, false);
     }
 
     if (match([ TokIdentifier ])) {
@@ -1031,6 +1033,25 @@ class Parser {
 
     var tok = peek();
     throw error(tok, 'Unexpected ${tok.type}');
+  }
+
+  function namespacedExprOrType(isAbsolute:Bool):Expr {
+    var path:Array<Token> = [ 
+      consume(TokTypeIdentifier, "Expect at least one type identifier")
+    ];
+    while(
+      check(TokScopeResolutionOperator) 
+      && checkNext(TokTypeIdentifier) 
+      && !isAtEnd()
+    ) {
+      advance();
+      path.push(advance());
+    }
+    var type = new Expr.Type(path, isAbsolute);
+    if (match([ TokScopeResolutionOperator ])) {
+      return new Expr.NamespacedExpr(type, expression());
+    }
+    return type;
   }
 
   function ternary():Expr {

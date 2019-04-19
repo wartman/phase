@@ -419,11 +419,14 @@ class PhpGenerator
   }
 
   public function visitAssocArrayLiteralExpr(expr:Expr.AssocArrayLiteral):String {
-    return '[' + [ for (i in 0...expr.keys.length) {
+    indent();
+    var out = '[\n' + [ for (i in 0...expr.keys.length) {
       var key = expr.keys[i];
       var value = expr.values[i];
-      '${generateExpr(key)} => ${generateExpr(value)}';
-    } ].join(', ') + ']';
+      getIndent() + '${generateExpr(key)} => ${generateExpr(value)}';
+    } ].join(',\n');
+    outdent();
+    return out + '\n' + getIndent() + ']';
   }
 
   // public function visitObjectLiteralExpr(expr:Expr.ObjectLiteral):String {
@@ -476,6 +479,7 @@ class PhpGenerator
       case Expr.Type | Expr.Static:
         generateExpr(expr.object) + '::' + switch expr.name.type {
           case TokTypeIdentifier: safeVar(expr.name);
+          case TokClass: 'class';
           default: '$' + safeVar(expr.name);
         } 
       default: 
@@ -555,6 +559,10 @@ class PhpGenerator
     }
 
     return out;
+  }
+
+  public function visitNamespacedExprExpr(expr:Expr.NamespacedExpr):String {
+    return generateExpr(expr.type) + '\\' + generateExpr(expr.expr);
   }
 
   public function visitTernaryExpr(expr:Expr.Ternary):String {

@@ -1,0 +1,7 @@
+package Test::Language::Classes {
+
+  class Foo {}
+
+  ::Expect.that(Foo.class, Foo |> get_class())
+
+}

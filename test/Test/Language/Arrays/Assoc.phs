@@ -1,0 +1,13 @@
+package Test::Language::Arrays {
+
+  var foo = 'foo'
+  var assoc = [
+    'a': 'b',
+    foo: 'foo'
+  ]
+
+  ::Expect.that(assoc['a'], 'a')
+  ::Expect.that(assoc[foo], 'foo')
+  ::Expect.that(assoc['foo'], 'foo')
+
+}
