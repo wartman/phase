@@ -138,12 +138,15 @@ class PhpGenerator
       + ';';
   }
 
+  public function visitGlobalStmt(stmt:Stmt.Global):String {
+    scope.define(stmt.name.lexeme, PhpVar);
+    return getIndent() + 'global $' + safeVar(stmt.name) + ';';
+  }
+
   public function visitUseStmt(stmt:Stmt.Use):String {
     // todo: handle annotations
     var path = stmt.path.map(t -> t.lexeme).join('\\');
     if (stmt.absolute) path = '\\' + path;
-
-  
 
     return switch stmt.kind {
       case UseNormal:

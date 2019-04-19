@@ -28,6 +28,7 @@ class Scanner {
     TokSuper => TokSuper,
     TokThis => TokThis,
     TokVar => TokVar,
+    TokGlobal => TokGlobal,
     TokWhile => TokWhile,
     TokUse => TokUse,
     TokPackage => TokPackage,

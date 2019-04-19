@@ -23,10 +23,15 @@ class Phase {
   }
 
   @:expose('compile')
-  public static function compile(src:String, dist:String) {
+  public static function compile(src:String, dist:String, ?onComplete) {
     src = Path.join([Sys.getCwd(), src]);
     dist = Path.join([Sys.getCwd(), dist]);
-    var compiler = new Compiler(src, dist, source -> new VisualErrorReporter(source));
+    var compiler = new Compiler(
+      src,
+      dist,
+      source -> new VisualErrorReporter(source),
+      onComplete
+    );
     compiler.compile();
   }
 

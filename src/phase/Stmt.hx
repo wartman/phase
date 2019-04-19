@@ -38,6 +38,10 @@ class Var implements Stmt {
   var initializer:Expr;
 }
 
+class Global implements Stmt {
+  var name:Token;
+}
+
 class Throw implements Stmt {
   var keyword:Token;
   var expr:Expr;

@@ -73,6 +73,7 @@ enum abstract TokenType(String) to String {
   var TokSwitch = 'switch';
   var TokCase = 'case';
   var TokDefault = 'default';
+  var TokGlobal = 'global';
 
   var TokIdentifier = '[identifier]';
   var TokTypeIdentifier = '[type-identifier]'; // An identifier that starts upper-case.

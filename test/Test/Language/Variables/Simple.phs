@@ -1,0 +1,7 @@
+package Test::Language::Variables {
+
+  global foo
+  var bar = foo
+  var bin
+
+}

@@ -49,6 +49,12 @@ class Parser {
         }
         return varDeclaration();
       }
+      if (match([ TokGlobal ])) {
+        if (annotation.length > 0) {
+          error(previous(), 'Annotations are not allowed here');
+        }
+        return globalDeclaration();
+      }
       if (match([ TokFunction ])) return functionDeclaration(false, annotation);
       if (match([ TokEnum ])) return enumDeclaration(annotation);
       if (match([ TokInterface ])) return interfaceDeclaration(annotation);
@@ -175,6 +181,12 @@ class Parser {
     }
     expectEndOfStatement();
     return new Stmt.Var(name, init);
+  }
+
+  function globalDeclaration() {
+    var name:Token = consume(TokIdentifier, 'Expect variable name.');
+    expectEndOfStatement();
+    return new Stmt.Global(name);
   }
 
   function functionDef(?isAnnon:Bool, ?annotations:Array<Expr>):Stmt {
