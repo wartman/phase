@@ -1061,7 +1061,8 @@ class Parser {
     }
     var type = new Expr.Type(path, isAbsolute);
     if (match([ TokScopeResolutionOperator ])) {
-      return new Expr.NamespacedExpr(type, expression());
+      var tok = consume(TokIdentifier, "Expect an identifier");
+      return new Expr.Namespaced(type, tok);
     }
     return type;
   }

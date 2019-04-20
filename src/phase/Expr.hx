@@ -122,9 +122,9 @@ class Type implements Expr {
   var absolute:Bool;
 }
 
-class NamespacedExpr implements Expr {
+class Namespaced implements Expr {
   var type:Expr.Type;
-  var expr:Expr;
+  var name:Token;
 }
 
 class Variable implements Expr {
