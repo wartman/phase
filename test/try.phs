@@ -73,7 +73,7 @@ package My::Test {
 
   @Cool( type = 'sure is' )
   @Beans::Thing(
-    'yay',
+    'yay', // Unnamed params ARE allowed, but they must come before named ones
     forEvery = 'meal',
     isPublic = false
   )

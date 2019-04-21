@@ -1,0 +1,25 @@
+{
+  "name": "phase",
+  "version": "0.0.1",
+  "description": "A scripting language that compiles to PHP",
+  "main": "dst/phase.node.js",
+  "bin": {
+    "phase": "phase-module.js"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wartman/phase.git"
+  },
+  "author": "wartman",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wartman/phase/issues"
+  },
+  "homepage": "https://github.com/wartman/phase#readme"
+}

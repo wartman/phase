@@ -13,10 +13,10 @@ enum GeneratorMode {
   GeneratingFunction;
 }
 
-enum GeneratorAnnotationStrategy {
-  AnnotatePhase;
-  AnnotateDocblock;
-  AnnotateOnClass;
+enum abstract GeneratorAnnotationStrategy(String) from String {
+  var AnnotatePhase = 'phase';
+  var AnnotateDocblock = 'docblock';
+  var AnnotateOnClass = 'on-class';
 }
 
 typedef PhpGeneratorOptions = {

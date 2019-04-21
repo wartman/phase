@@ -1,13 +1,14 @@
 -cp src
 -lib hxnodejs
--main Phase
 
 --each
 
+-main Phase
 -js bin/phase.js
 
 --next
 
 # For use as imports
 -D noCmd
--js bin/phase-module.js
+phase.NodeCompiler
+-js dst/phase.node.js
