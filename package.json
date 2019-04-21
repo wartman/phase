@@ -3,9 +3,6 @@
   "version": "0.0.1",
   "description": "A scripting language that compiles to PHP",
   "main": "dst/phase.node.js",
-  "bin": {
-    "phase": "phase-module.js"
-  },
   "directories": {
     "test": "test"
   },
