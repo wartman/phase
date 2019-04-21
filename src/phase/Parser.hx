@@ -520,7 +520,18 @@ class Parser {
       var params:Array<Expr> = [];
       if (match([ TokLeftParen ])) {
         if (!check(TokRightParen)) {
-          params = parseList(TokComma, expression);
+          var visitedNamedParam:Bool = false;
+          params = parseList(TokComma, () -> {
+            var e = expression();
+            if (Std.is(e, Expr.Assign)) {
+              visitedNamedParam = true;
+              return e;
+            }
+            if (visitedNamedParam) {
+              throw error(previous(), 'All unnamed params MUST come before named ones in annotations');
+            }
+            return e;
+          });
           ignoreNewlines();
         }
         consume(TokRightParen, "Expect ')' at the end of metadata entries");

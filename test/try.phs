@@ -73,9 +73,9 @@ package My::Test {
 
   @Cool( type = 'sure is' )
   @Beans::Thing(
+    'yay',
     forEvery = 'meal',
-    isPublic = false,
-    'yay'
+    isPublic = false
   )
   class MyBar 
     extends Bar

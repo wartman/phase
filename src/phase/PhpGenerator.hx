@@ -423,7 +423,8 @@ class PhpGenerator
             var assign:Expr.Assign = cast param;
             out += getIndent() + '$' + tmp + '->' + assign.name.lexeme 
               +  ' = ' + generateExpr(assign.value) + ';\n';
-          default: args.push(generateExpr(param));
+          default: 
+            args.push(generateExpr(param));
         }
         out = getIndent() + '$' + tmp + ' = new ' + name + '(' + args.join(', ') + ');\n' + out;
         out += getIndent() + 'return $' + tmp + ';\n';
