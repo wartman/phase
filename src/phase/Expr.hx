@@ -53,12 +53,12 @@ class Call implements Expr {
 
 class Get implements Expr {
   var object:Expr;
-  var name:Token;
+  var name:Expr;
 }
 
 class Set implements Expr {
   var object:Expr;
-  var name:Token;
+  var name:Expr;
   var value:Expr;
 }
 

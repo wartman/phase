@@ -871,10 +871,20 @@ class Parser {
         expr = new Expr.Call(expr, previous(), [ shortLambda(!check(TokNewline)) ]);
       } else if (match([ TokDot ])) {
         ignoreNewlines();
-        var name = if (match([ TokTypeIdentifier, TokClass ])) {
-          previous();
+        var name:Expr = if (match([ TokLeftBrace ])) {
+          ignoreNewlines();
+          var ret = expression();
+          if (Std.is(ret, Expr.Variable)) {
+            // Required to make this point to a var. 
+            ret = new Expr.Grouping(ret);
+          }
+          ignoreNewlines();
+          consume(TokRightBrace, "Expect a '}'");
+          ret;
+        } else if (match([ TokTypeIdentifier, TokClass ])) {
+          new Expr.Variable(previous());
         } else {
-          consume(TokIdentifier, "Expect property name after '.'.");
+          new Expr.Variable(consume(TokIdentifier, "Expect property name after '.'."));
         }
         expr = new Expr.Get(expr, name);
       } else if (match([ TokLeftBracket ])) {
@@ -991,23 +1001,10 @@ class Parser {
 
     if (match([ TokScopeResolutionOperator ])) {
       return namespacedExprOrType(true);
-      // var path = parseList(
-      //   TokScopeResolutionOperator, 
-      //   () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
-      // );
-      // return new Expr.Type(path, true);
     }
 
     if (check(TokTypeIdentifier)) {
       return namespacedExprOrType(false);
-      // var path = [ previous() ];
-      // if (match([TokScopeResolutionOperator])) {
-      //   path = path.concat(parseList(
-      //     TokScopeResolutionOperator, 
-      //     () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
-      //   ));
-      // }
-      // return new Expr.Type(path, false);
     }
 
     if (match([ TokIdentifier ])) {
@@ -1032,7 +1029,6 @@ class Parser {
 
     if (match([ TokLeftBrace ])) {
       return shortLambda(!check(TokNewline));
-      // return objectOrLambda();
     }
 
     if (match([ TokFunction ])) {
@@ -1118,20 +1114,10 @@ class Parser {
     return new Expr.AssocArrayLiteral(end, keys, values);
   }
 
-  // function objectOrLambda():Expr {
-  //   var isInline:Bool = !check(TokNewline);
-  //   ignoreNewlines();
-  //   if ((check(TokIdentifier) && checkNext(TokColon))
-  //       || (check(TokString) && checkNext(TokColon))
-  //       || check(TokRightBrace)) {
-  //     return objectLiteral();
-  //   }
-  //   return shortLambda(isInline);
-  // }
-
   function shortLambda(isInline:Bool = false) {
     ignoreNewlines();
     var params:Array<Stmt.FunctionArg> = [];
+    var maybeNeedIt:Bool = false;
     if (match([ TokBar ])) {
       if (!check(TokBar)) {
         do {
@@ -1149,7 +1135,7 @@ class Parser {
         { 
           name: new Token(TokIdentifier, 'it', null, previous().pos),
           type: null,
-          expr: null
+          expr: new Expr.Literal(null) // Allows `it` to be optional 
         }
       ];
     }

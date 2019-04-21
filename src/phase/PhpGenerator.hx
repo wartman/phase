@@ -268,7 +268,11 @@ class PhpGenerator
           for (p in fun.params) {
             if (p.isInit == true) {
               var init = new Stmt.Expression(
-                new Expr.Set(new Expr.This(p.name), p.name, new Expr.Variable(p.name))
+                new Expr.Set(
+                  new Expr.This(p.name),
+                  new Expr.Variable(p.name),
+                  new Expr.Variable(p.name)
+                )
               );
               body.statements.unshift(init);
             }
@@ -483,8 +487,8 @@ class PhpGenerator
         switch getter.object.getClass() {
           case Expr.Type | Expr.Static:
             // Don't add the `$` to the function name.
-            generateExpr(getter.object) + '::' + safeVar(getter.name);
-          default: generateExpr(getter.object) + '->' + safeVar(getter.name);
+            generateExpr(getter.object) + '::' + getProperty(getter.name);
+          default: generateExpr(getter.object) + '->' + getProperty(getter.name);
         }
       case Expr.Type:
         // Initializer
@@ -497,27 +501,32 @@ class PhpGenerator
   public function visitGetExpr(expr:Expr.Get):String {
     return switch expr.object.getClass() {
       case Expr.Type | Expr.Static:
-        generateExpr(expr.object) + '::' + switch expr.name.type {
-          case TokTypeIdentifier: safeVar(expr.name);
-          case TokClass: 'class';
-          default: '$' + safeVar(expr.name);
-        } 
+        generateExpr(expr.object) + '::' + getProperty(expr.name, true);
       default: 
-        generateExpr(expr.object) + '->' + safeVar(expr.name);
+        generateExpr(expr.object) + '->' + getProperty(expr.name);
     }
   }
 
   public function visitSetExpr(expr:Expr.Set):String {
     var left = switch expr.object.getClass() {
       case Expr.Type | Expr.Static: 
-        generateExpr(expr.object) + '::' + switch expr.name.type {
-          case TokTypeIdentifier: safeVar(expr.name);
-          default: '$' + safeVar(expr.name);
-        } 
+        generateExpr(expr.object) + '::' + getProperty(expr.name, true);
       default: 
-        generateExpr(expr.object) + '->' + safeVar(expr.name);
+        generateExpr(expr.object) + '->' + getProperty(expr.name);
     }
     return left + ' = ' + generateExpr(expr.value);
+  }
+
+  function getProperty(expr:Expr, isStatic:Bool = false):String return switch Type.getClass(expr) {
+    case Expr.Variable: 
+      var e:Expr.Variable = cast expr;
+      switch e.name.type {
+        case TokTypeIdentifier: safeVar(e.name);
+        case TokClass: 'class';
+        default: isStatic ? '$' + safeVar(e.name) : safeVar(e.name);
+      }
+    default:
+      '{' + generateExpr(expr) + '}';
   }
 
   public function visitSubscriptGetExpr(expr:Expr.SubscriptGet):String {

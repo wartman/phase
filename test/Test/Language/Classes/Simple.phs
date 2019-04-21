@@ -4,6 +4,8 @@ package Test::Language::Classes {
 
     static bin = 'bin'
 
+    static getBin() { static.bin }
+
     foo
     private bar
 
@@ -18,10 +20,14 @@ package Test::Language::Classes {
   }
 
   ::Expect.that(Simple.bin, 'bin')
+  ::Expect.that(Simple.getBin(), 'bin')
 
   var cls = Simple('foo')
 
+  var foo = 'foo'
   ::Expect.that(cls.foo, 'foo')
   ::Expect.that(cls.getBar(), 'bar')
+  ::Expect.that(cls.{'foo'}, 'foo')
+  ::Expect.that(cls.{foo}, 'foo')
 
 }
