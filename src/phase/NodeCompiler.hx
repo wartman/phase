@@ -24,30 +24,26 @@ class NodeCompiler {
   public static function compile(src:String, ?options:PhpGeneratorOptions, ?relative:String):Promise<Array<PhaseModule>> {
     if (relative == null) relative = src.normalize();
     if (options == null) options = { annotation: AnnotateOnClass };
-    try {
-      return Promise.all([ for (name in FileSystem.readDirectory(src)) {
-        var path = Path.join([ src, name ]);
-        if (path.isDirectory()) {
-          compile(path, options, relative);
-        } else if (extensions.has(path.extension())) {
-          compileFile(path, options, relative);
-        } else {
-          Promise.resolve(null);
-        }
-      } ]).then(
-        parts -> parts
-          .filter(p -> p != null)
-          .fold((value:Dynamic, result:Array<PhaseModule>) -> {
-            if (Std.is(value, Array)) {
-              return result.concat(value);
-            }
-            result.push(value);
-            return result;
-          }, [])
-      );
-    } catch(e:Dynamic) {
-      return Promise.reject(e);
-    }
+    return Promise.all([ for (name in FileSystem.readDirectory(src)) {
+      var path = Path.join([ src, name ]);
+      if (path.isDirectory()) {
+        compile(path, options, relative);
+      } else if (extensions.has(path.extension())) {
+        compileFile(path, options, relative);
+      } else {
+        Promise.resolve(null);
+      }
+    } ]).then(
+      parts -> parts
+        .filter(p -> p != null)
+        .fold((value:Dynamic, result:Array<PhaseModule>) -> {
+          if (Std.is(value, Array)) {
+            return result.concat(value);
+          }
+          result.push(value);
+          return result;
+        }, [])
+    );
   }
 
   @:expose('write')
@@ -72,8 +68,7 @@ class NodeCompiler {
     var generator = new PhpGenerator(parser.parse(), reporter, options);
 
     if (reporter.hadError()) {
-      throw 'Parsing failed: ${path}';
-      return Promise.reject(null);
+      return Promise.reject('Parsing failed: ${path}');
     }
 
     return Promise.resolve({

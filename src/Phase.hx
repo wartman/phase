@@ -2,7 +2,6 @@ import phase.*;
 
 using haxe.io.Path;
 
-@:expose('Phase')
 @:allow(phase)
 class Phase {
 
@@ -11,18 +10,15 @@ class Phase {
   ];
 
   public static function main() {
-    #if !noCmd
-      var args = Sys.args();
-      switch args.length {
-        case 2: 
-          compile(args[0], args[1]);
-        default:
-          Sys.print('Usage: phase [src] [dst]');
-      }
-    #end
+    var args = Sys.args();
+    switch args.length {
+      case 2: 
+        compile(args[0], args[1]);
+      default:
+        Sys.print('Usage: phase [src] [dst]');
+    }
   }
 
-  @:expose('compile')
   public static function compile(src:String, dist:String, ?onComplete) {
     src = Path.join([Sys.getCwd(), src]);
     dist = Path.join([Sys.getCwd(), dist]);

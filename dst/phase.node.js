@@ -892,30 +892,26 @@ phase_NodeCompiler.compile = $hx_exports["compile"] = function(src,options,relat
 	if(options == null) {
 		options = { annotation : "on-class"};
 	}
-	try {
-		var _g = [];
-		var _g1 = 0;
-		var _g2 = js_node_Fs.readdirSync(src);
-		while(_g1 < _g2.length) {
-			var name = _g2[_g1];
-			++_g1;
-			var path = haxe_io_Path.join([src,name]);
-			_g.push(sys_FileSystem.isDirectory(path) ? phase_NodeCompiler.compile(path,options,relative) : Lambda.has(phase_NodeCompiler.extensions,haxe_io_Path.extension(path)) ? phase_NodeCompiler.compileFile(path,options,relative) : Promise.resolve(null));
-		}
-		return Promise.all(_g).then(function(parts) {
-			return Lambda.fold(parts.filter(function(p) {
-				return p != null;
-			}),function(value,result) {
-				if(((value) instanceof Array) && value.__enum__ == null) {
-					return result.concat(value);
-				}
-				result.push(value);
-				return result;
-			},[]);
-		});
-	} catch( e ) {
-		return Promise.reject(((e) instanceof js__$Boot_HaxeError) ? e.val : e);
+	var _g = [];
+	var _g1 = 0;
+	var _g2 = js_node_Fs.readdirSync(src);
+	while(_g1 < _g2.length) {
+		var name = _g2[_g1];
+		++_g1;
+		var path = haxe_io_Path.join([src,name]);
+		_g.push(sys_FileSystem.isDirectory(path) ? phase_NodeCompiler.compile(path,options,relative) : Lambda.has(phase_NodeCompiler.extensions,haxe_io_Path.extension(path)) ? phase_NodeCompiler.compileFile(path,options,relative) : Promise.resolve(null));
 	}
+	return Promise.all(_g).then(function(parts) {
+		return Lambda.fold(parts.filter(function(p) {
+			return p != null;
+		}),function(value,result) {
+			if(((value) instanceof Array) && value.__enum__ == null) {
+				return result.concat(value);
+			}
+			result.push(value);
+			return result;
+		},[]);
+	});
 };
 phase_NodeCompiler.write = $hx_exports["write"] = function(dst,modules) {
 	var _g = 0;
@@ -938,7 +934,7 @@ phase_NodeCompiler.compileFile = function(path,options,relative) {
 	var parser = new phase_Parser(scanner.scan(),reporter);
 	var generator = new phase_PhpGenerator(parser.parse(),reporter,options);
 	if(reporter.hadError()) {
-		throw new js__$Boot_HaxeError("Parsing failed: " + path);
+		return Promise.reject("Parsing failed: " + path);
 	}
 	return Promise.resolve({ realPath : path, name : haxe_io_Path.withoutExtension(haxe_io_Path.normalize(HxOverrides.substr(path,relative.length + 1,null))), source : source, generated : generator.generate()});
 };

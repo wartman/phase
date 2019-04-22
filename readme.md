@@ -1,6 +1,6 @@
 Phase
 =====
-A simple replacement for PHP. Should compile to clean, well formatted, useable PHP.
+A simple replacement for PHP. Should (eventually) compile to clean, well formatted, useable PHP.
 
 Syntax
 ------
