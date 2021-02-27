@@ -1,4 +1,4 @@
-package Test::Language::Enums {
+namespace Test::Language::Enums {
 
   // Showing off the compact syntax:
   enum Simple { Foo; Bar }

@@ -1,4 +1,4 @@
-package Test::Language::Classes {
+namespace Test::Language::Classes {
 
   class Simple {
 
@@ -29,5 +29,8 @@ package Test::Language::Classes {
   ::Expect.that(cls.getBar(), 'bar')
   ::Expect.that(cls.{'foo'}, 'foo')
   ::Expect.that(cls.{foo}, 'foo')
+
+  // Check for named arguments:
+  ::Expect.that(Simple(foo: 'foo').foo, 'foo');
 
 }

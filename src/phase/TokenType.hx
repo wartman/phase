@@ -63,7 +63,7 @@ enum abstract TokenType(String) to String {
   var TokVar = 'var';
   var TokWhile = 'while';
   var TokUse = 'use';
-  var TokPackage = 'package';
+  var TokNamespace = 'namespace';
   var TokAs = 'as';
   var TokIn = 'in';
   var TokIs = 'is';

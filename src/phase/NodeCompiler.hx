@@ -1,6 +1,6 @@
 package phase;
 
-import js.Promise;
+import js.lib.Promise;
 import phase.PhpGenerator;
 
 using Lambda;

@@ -27,7 +27,7 @@ class Use implements Stmt {
   var annotation:Array<Expr>;
 }
 
-class Package implements Stmt {
+class Namespace implements Stmt {
   var path:Array<Token>;
   var decls:Array<Stmt>;
   var annotation:Array<Expr>;

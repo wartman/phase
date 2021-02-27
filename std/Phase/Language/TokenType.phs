@@ -1,7 +1,6 @@
-package Phase::Language {
+namespace Phase::Language {
 
   enum TokenType {
-
     TokAt = '@'
     TokSharp = '#'
     TokLeftParen = '('
@@ -63,7 +62,7 @@ package Phase::Language {
     Tok= 'var'
     TokWhile = 'while'
     TokUse = 'use'
-    TokPackage = 'package'
+    TokPackage = 'namespace'
     TokAs = 'as'
     TokIn = 'in'
     TokIs = 'is'

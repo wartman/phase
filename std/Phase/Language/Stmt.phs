@@ -1,4 +1,4 @@
-package Phase::Language {
+namespace Phase::Language {
 
   interface Stmt {
     accept(visitor:StmtVisitor)

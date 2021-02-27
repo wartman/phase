@@ -1,14 +1,12 @@
-package Phase::Language {
+namespace Phase::Language {
 
   class Token {
-
     new(
       this.type: String,
       this.lexeme: String,
       this.literal: String = null,
       this.pos: Position
     ) {}
-
   }
 
 }

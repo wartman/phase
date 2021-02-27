@@ -1,13 +1,11 @@
-package Phase::Language {
+namespace Phase::Language {
 
   class Position {
-
     new(
-      this.line: Int,
-      this.offset: Int,
+      this.start: Int,
+      this.end: Int,
       this.file: String
     ) {}
-
   }
 
 }

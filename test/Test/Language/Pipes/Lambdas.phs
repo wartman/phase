@@ -1,4 +1,4 @@
-package Test::Language::Pipes {
+namespace Test::Language::Pipes {
 
   var foo = 'FOO.BAR'
     |> strtolower()

@@ -1,4 +1,4 @@
-package Test::Example {
+namespace Test::Example {
 
   use Doctrine::ORM::Annotation::{
     Entity,
@@ -13,15 +13,15 @@ package Test::Example {
   class Post {
     
     @Id()
-    @Column(type="integer")
+    @Column(type: "integer")
     @GeneratedValue()
     id: Int
 
     @Id()
-    @Column(type="string")
+    @Column(type: "string")
     name: String
 
-    @Column(type="integer")
+    @Column(type: "integer")
     date: Int
 
   }

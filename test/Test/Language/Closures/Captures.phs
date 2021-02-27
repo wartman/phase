@@ -1,4 +1,4 @@
-package Test::Language::Closures {
+namespace Test::Language::Closures {
 
   var foo = 'foo'
   

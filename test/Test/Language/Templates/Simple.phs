@@ -1,4 +1,4 @@
-package Test::Language::Templates {
+namespace Test::Language::Templates {
 
   var tpl = { |parts, placeholders|
     var out = ''

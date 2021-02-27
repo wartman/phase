@@ -20,7 +20,7 @@ class Parser {
   final reporter:ErrorReporter;
   var current:Int;
   var uid:Int = 0;
-  var inPackage:Bool = false;
+  var inNamespace:Bool = false;
 
   public function  new(tokens:Array<Token>, reporter:ErrorReporter) {
     this.tokens = tokens;
@@ -61,7 +61,7 @@ class Parser {
       if (match([ TokTrait ])) return traitDeclaration(annotation);
       if (match([ TokClass ])) return classDeclaration(annotation);
       if (match([ TokUse ])) return useDeclaration(annotation);
-      if (match([ TokPackage ])) return packageDeclaration(annotation);
+      if (match([ TokNamespace ])) return packageDeclaration(annotation);
       return statement();
     } catch (error:ParserError) {
       synchronize();
@@ -82,8 +82,8 @@ class Parser {
   }
 
   function packageDeclaration(annotation:Array<Expr>) {
-    if (inPackage) error(previous(), 'Packages cannot be nested');
-    inPackage = true;
+    if (inNamespace) error(previous(), 'Namespaces cannot be nested');
+    inNamespace = true;
 
     var path = parseList(
       TokScopeResolutionOperator, 
@@ -101,12 +101,12 @@ class Parser {
     consume(TokRightBrace, 'Expect `}` at the end of a package declaration.');
     ignoreNewlines();
 
-    inPackage = false;
-    return new Stmt.Package(path, decls, annotation);
+    inNamespace = false;
+    return new Stmt.Namespace(path, decls, annotation);
   }
 
   function useDeclaration(annotation:Array<Expr>) {
-    if (!inPackage) error(previous(), '`use` is not allowed outside a package');
+    if (!inNamespace) error(previous(), '`use` is not allowed outside a namespace');
     
     var kind:Stmt.UseKind = UseNormal;
     var absolute = false;
@@ -517,24 +517,13 @@ class Parser {
         TokScopeResolutionOperator, 
         () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
       );
-      var params:Array<Expr> = [];
+      var params:Array<Expr.CallArgument> = [];
       if (match([ TokLeftParen ])) {
         if (!check(TokRightParen)) {
-          var visitedNamedParam:Bool = false;
-          params = parseList(TokComma, () -> {
-            var e = expression();
-            if (Std.is(e, Expr.Assign)) {
-              visitedNamedParam = true;
-              return e;
-            }
-            if (visitedNamedParam) {
-              throw error(previous(), 'All unnamed params MUST come before named ones in annotations');
-            }
-            return e;
-          });
-          ignoreNewlines();
+          params = parseArguments();
         }
-        consume(TokRightParen, "Expect ')' at the end of metadata entries");
+        ignoreNewlines();
+        consume(TokRightParen, "Expect ')' at the end of an annotation");
       }
       ignoreNewlines();
       annotation.push(new Expr.Annotation(path, params, absolute, null));
@@ -837,13 +826,13 @@ class Parser {
       switch Type.getClass(target) {
         case Expr.Call: 
           var caller:Expr.Call = cast target;
-          caller.args.push(expr);
+          caller.args.push(Positional(expr));
           expr = caller;
         case Expr.Lambda:
           expr = new Expr.Call(
             new Expr.Grouping(target),
             op,
-            [ expr ]
+            [ Positional(expr) ]
           );
         default:
           throw error(op, 'Expected a function/method call or a lambda');
@@ -879,7 +868,7 @@ class Parser {
       if (match([ TokLeftParen ])) {
         expr = finishCall(expr);
       } else if (match([ TokLeftBrace ])) {
-        expr = new Expr.Call(expr, previous(), [ shortLambda(!check(TokNewline)) ]);
+        expr = new Expr.Call(expr, previous(), [ Positional(shortLambda(!check(TokNewline))) ]);
       } else if (match([ TokDot ])) {
         ignoreNewlines();
         var name:Expr = if (match([ TokLeftBrace ])) {
@@ -917,13 +906,10 @@ class Parser {
   }
 
   function finishCall(callee:Expr):Expr {
-    var arguments:Array<Expr> = [];
+    var arguments:Array<Expr.CallArgument> = [];
 
     if (!check(TokRightParen)) {
-      do {
-        ignoreNewlines();
-        arguments.push(expression());
-      } while (match([ TokComma ]));
+      arguments = parseArguments();
     }
 
     ignoreNewlines();
@@ -931,10 +917,29 @@ class Parser {
 
     // Handle trailing arguments (eg, `foo('a') { it }`)
     if (match([ TokLeftBrace ])) {
-      arguments.push(shortLambda(!check(TokNewline)));
+      arguments.push(Positional(shortLambda(!check(TokNewline))));
     }
 
     return new Expr.Call(callee, paren, arguments);
+  }
+
+  function parseArguments():Array<Expr.CallArgument> {
+    var isAfterNamedArgument = false;
+    return parseList(TokComma, () -> {
+      if (check(TokIdentifier) && checkNext(TokColon)) {
+        isAfterNamedArgument = true;
+        consume(TokIdentifier, 'expected an identifier');
+        var name = previous().lexeme;
+        consume(TokColon, 'expected a ":"');
+        var expr = expression();
+        Expr.CallArgument.Named(name, expr);
+      } else {
+        if (isAfterNamedArgument) {
+          throw error(peek(), 'Positional arguments cannot come after named ones');
+        }
+        Expr.CallArgument.Positional(expression());
+      }
+    });
   }
 
   function taggedTemplate(callee:Expr):Expr {
@@ -955,8 +960,8 @@ class Parser {
     parts.push(primary());
 
     return new Expr.Call(callee, firstTok, [
-      new Expr.ArrayLiteral(firstTok, parts),
-      new Expr.ArrayLiteral(firstTok, placeholders)
+      Positional(new Expr.ArrayLiteral(firstTok, parts)),
+      Positional(new Expr.ArrayLiteral(firstTok, placeholders))
     ]);
   }
 

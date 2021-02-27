@@ -11,4 +11,4 @@
 # For use as imports
 -D noCmd
 phase.NodeCompiler
--js dst/phase.node.js
+-js cjs/index.js

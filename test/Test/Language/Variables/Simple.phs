@@ -1,4 +1,4 @@
-package Test::Language::Variables {
+namespace Test::Language::Variables {
 
   global foo
   var bar = foo

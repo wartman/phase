@@ -16,11 +16,18 @@ enum GeneratorMode {
 enum abstract GeneratorAnnotationStrategy(String) from String {
   var AnnotatePhase = 'phase';
   var AnnotateDocblock = 'docblock';
+  var AnnotatePhpAttribute = 'attribute';
   var AnnotateOnClass = 'on-class';
 }
 
+enum abstract PhpVersion(String) from String {
+  var Php8 = '8';
+  var Php7 = '7';
+}
+
 typedef PhpGeneratorOptions = {
-  ?annotation: GeneratorAnnotationStrategy
+  ?annotation: GeneratorAnnotationStrategy,
+  ?version: PhpVersion
 };
 
 class PhpGenerator 
@@ -30,7 +37,7 @@ class PhpGenerator
 
   static final typeAliases = [
     'String' => 'string',
-    'Int' => 'integer',
+    'Int' => 'int',
     'Array' => 'array',
     'Callable' => 'callable',
     'Scalar' => 'scalar'
@@ -57,8 +64,14 @@ class PhpGenerator
     this.stmts = stmts;
     this.reporter = reporter;
 
+    if (this.options.version == null) {
+      this.options.version = Php8;
+    }
     if (this.options.annotation == null) {
-      this.options.annotation = AnnotateOnClass;
+      this.options.annotation = switch this.options.version {
+        case Php7: AnnotateOnClass;
+        case Php8: AnnotatePhpAttribute;
+      }
     }
   }
 
@@ -86,7 +99,7 @@ class PhpGenerator
     return expr.accept(this);
   }
   
-  public function visitPackageStmt(stmt:Stmt.Package):String {
+  public function visitNamespaceStmt(stmt:Stmt.Namespace):String {
     var out = 'namespace ' + stmt.path.map(t -> t.lexeme).join('\\') + ' {\n\n';
     scope.push();
     indent();
@@ -242,8 +255,12 @@ class PhpGenerator
         'const';
       case AAbstract: mode == GeneratingInterface ? null : 'abstract';
     }).filter(f -> f != null).join(' ') + switch stmt.kind {
-      case FVar(v, _):
-        var out = isConst 
+      case FVar(v, t):
+        var out = switch options.version {
+          case Php8 if (t != null && !isConst): ' ' + generateTypePath(t);
+          default: '';
+        }
+        out += isConst
           ? ' ' + safeVar(stmt.name)
           : ' $' + safeVar(stmt.name);
         if (v.initializer != null) {
@@ -260,6 +277,9 @@ class PhpGenerator
         scope.push();
 
         var out = ' function ' + name + '(' + functionParams(fun.params) + ')';
+        if (fun.ret != null) {
+          out += ':' + generateTypePath(fun.ret);
+        }
 
         if (stmt.access.indexOf(AAbstract) < 0) {
           var body:Stmt.Block = cast fun.body; 
@@ -405,28 +425,20 @@ class PhpGenerator
 
   public function visitAnnotationExpr(expr:Expr.Annotation):String {
     var name = expr.path.map(t -> t.lexeme).join('\\');
+    function generateArg(arg:Expr.CallArgument) return switch arg {
+      case Positional(expr): generateExpr(expr);
+      case Named(name, expr): '${name}: ${generateExpr(expr)}';
+    }
     return switch options.annotation {
       case AnnotateDocblock: 
-        '@' + name + '('  + expr.params.map(param -> switch param.getClass() {
-          case Expr.Assign:
-            var assign:Expr.Assign = cast param;
-            '${assign.name.lexeme} = ${generateExpr(assign.value)}';
-          default: generateExpr(param);
-        }).join(', ') + ')';
+        '@' + name + '('  + expr.params.map(generateArg).join(', ') + ')';
+      case AnnotatePhpAttribute: 
+        name + '('  + expr.params.map(generateArg).join(', ') + ')';
       case AnnotatePhase | AnnotateOnClass:
         var tmp = tempVar('annotation');
-        var args:Array<String> = [];
         indent();
         var out = '';
-        for (param in expr.params) switch param.getClass() {
-          case Expr.Assign:
-            var assign:Expr.Assign = cast param;
-            out += getIndent() + '$' + tmp + '->' + assign.name.lexeme 
-              +  ' = ' + generateExpr(assign.value) + ';\n';
-          default: 
-            args.push(generateExpr(param));
-        }
-        out = getIndent() + '$' + tmp + ' = new ' + name + '(' + args.join(', ') + ');\n' + out;
+        out = getIndent() + '$' + tmp + ' = new ' + name + '(' + expr.params.map(generateArg).join(', ') + ');\n' + out;
         out += getIndent() + 'return $' + tmp + ';\n';
         outdent();
         '(function () {\n' + out + getIndent() + '})()';
@@ -496,7 +508,10 @@ class PhpGenerator
         'new ' + generateExpr(expr.callee);
       default: generateExpr(expr.callee);
     }
-    return '$callee(' + expr.args.map(generateExpr).join(', ') + ')';
+    return '$callee(' + expr.args.map(arg -> switch arg {
+      case Positional(expr): generateExpr(expr);
+      case Named(name, expr): '${name}: ${generateExpr(expr)}';
+    }).join(', ') + ')';
   }
 
   public function visitGetExpr(expr:Expr.Get):String {
@@ -658,7 +673,7 @@ class PhpGenerator
       kind = PhpFun;
     } else if (mode == GeneratingClosure) {
       if (!isLocal(name) && kind != PhpFun) {
-        closureCaptures.push(name);
+        if (!closureCaptures.contains(name)) closureCaptures.push(name);
       }
     }
 
@@ -705,6 +720,12 @@ class PhpGenerator
           out += '\n' + getIndent() + ' * ' + generateExpr(a);
         }
         out += '\n' + getIndent() + ' */';
+      case AnnotatePhpAttribute:
+        var out = '';
+        for (a in annotations) {
+          out += '\n' + getIndent() + '#[' + generateExpr(a) + ']';
+        }
+        out;
       case AnnotatePhase:
         var kind = target.field == null ? '__CLASS__' : target.field;
         var reg = '\\Phase\\Boot::registerAnnotation($clsName::class, "$kind", '

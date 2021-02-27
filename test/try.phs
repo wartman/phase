@@ -1,4 +1,4 @@
-package My::Test {
+namespace My::Test {
 
   use Foo::Bin as Bar
   use My::Annotation::{ Cool, Beans }
@@ -66,16 +66,14 @@ package My::Test {
   }
 
   trait HasThings {
-
     getThings() { 'things' }
-
   }
 
-  @Cool( type = 'sure is' )
+  @Cool(type: 'sure is')
   @Beans::Thing(
-    'yay', // Unnamed params ARE allowed, but they must come before named ones
-    forEvery = 'meal',
-    isPublic = false
+    'yay',
+    forEvery: 'meal',
+    isPublic: false
   )
   class MyBar 
     extends Bar
@@ -91,7 +89,7 @@ package My::Test {
     static bin = []
     static private bar = 'bar'
 
-    static foob(thing: String = 'ok') {
+    static foob(thing: String = 'ok'): String {
       return static.bin +++ static.BIG
     }
 

@@ -1,4 +1,4 @@
-package Test::Language::Enums {
+namespace Test::Language::Enums {
 
   enum Custom {
     Foo = 'Foo'

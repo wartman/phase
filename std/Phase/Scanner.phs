@@ -1,4 +1,4 @@
-package Phase {
+namespace Phase {
 
   use Phase::Language::{ Token, TokenType, Position }
 
@@ -46,8 +46,7 @@ package Phase {
     private tokens: Array = []
     private reporter: ErrorReporter
     private start: Int
-    private current: Int
-    private line: Int
+    private end: Int
 
     new(
       this.source,
@@ -58,11 +57,10 @@ package Phase {
     scan() {
       this.tokens = []
       this.start = 0
-      this.current = 0
-      this.line = 1
+      this.end = 0
 
       while(!this.isAtEnd()) {
-        this.start = this.current
+        this.start = this.end
         this.scanToken()
       }
       this.addToken(TokenType.TokEof)
@@ -88,7 +86,7 @@ package Phase {
           if (this.match('=')) {
             this.addToken(TokenType.TokPlusEqual);
           } else if(this.match('+')) {
-            this.addToken(this.match('+') ? TokConcat : TokPlusPlus);
+            this.addToken(this.match('+') ? TokenType.TokConcat : TokenType.TokPlusPlus);
           } else {
             this.addToken(TokenType.TokPlus);
           }
@@ -101,36 +99,46 @@ package Phase {
         case '=': this.addToken(this.match('=') ? TokenType.TokBoolEqual : TokenType.TokEqual);
         case '<': this.addToken(this.match('=') ? TokenType.TokLessEqual : TokenType.TokLess);
         case '>': this.addToken(this.match('=') ? TokenType.TokGreaterEqual : TokenType.TokGreater);
+        case '/':
+          if (this.match('/')) {
+            // Comment -- ignore
+            while (this.peek() != '\n' && !this.isAtEnd()) this.advance();
+            if (this.peek() == '\n') {
+
+            } 
+          } else {
+            this.addToken(TokenType.TokSlash);
+          }
         // etc
       }
     }
 
     private isAtEnd() {
-      return this.current >= (this.source |> strlen())
+      return this.end >= (this.source |> strlen())
     }
 
     private peek() {
       if (this.isAtEnd()) {
         return ''
       }
-      return this.source[this.current]
+      return this.source[this.end]
     }
 
     private peekNext() {
       if (this.isAtEnd()) {
         return ''
       }
-      return this.source[this.current + 1]
+      return this.source[this.end + 1]
     }
 
     private advance() {
-      this.current++
-      return this.source[this.current - 1]
+      this.end++
+      return this.source[this.end - 1]
     }
 
     private addToken(type, literal = '') {
-      var text = this.source |> { substr(it, this.start, this.current) }
-      var pos = Position(this.line, this.current, this.file)
+      var text = this.source |> { substr(it, this.start, this.end) }
+      var pos = Position(this.start, this.end, this.file)
       this.tokens[] = Token(type, text, literal, pos)
     }
 

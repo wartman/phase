@@ -1,0 +1,9 @@
+namespace Test::Language::Functions {
+  
+  function foo(foo: String, bar: String) {
+    return '${foo} ${bar}'
+  }
+
+  ::Expect.that(foo(bar: 'one', foo: 'two'), 'two one')
+
+}

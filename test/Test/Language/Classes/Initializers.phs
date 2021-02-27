@@ -1,4 +1,4 @@
-package Test::Language::Classes {
+namespace Test::Language::Classes {
 
   class ValueClass {
 
@@ -12,7 +12,7 @@ package Test::Language::Classes {
       this.bin: String
     ) {}
 
-    getBin() {
+    getBin(): String {
       return this.bin
     }
 

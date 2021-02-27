@@ -7,7 +7,7 @@ interface Expr {
 
 class Annotation implements Expr {
   var path:Array<Token>;
-  var params:Array<Expr>;
+  var params:Array<CallArgument>;
   var relative:Bool;
   var expr:Expr;
 }
@@ -45,10 +45,15 @@ class Range implements Expr {
   var to:Expr;
 }
 
+enum CallArgument {
+  Positional(expr:Expr);
+  Named(name:String, expr:Expr);
+}
+
 class Call implements Expr {
   var callee:Expr;
   var paren:Token;
-  var args:Array<Expr>;
+  var args:Array<CallArgument>;
 }
 
 class Get implements Expr {

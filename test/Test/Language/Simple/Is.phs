@@ -1,4 +1,4 @@
-package Test::Languag::Simple {
+namespace Test::Languag::Simple {
 
   class Foo {}
 

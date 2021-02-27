@@ -1,4 +1,4 @@
-package Test::Language::Switches {
+namespace Test::Language::Switches {
 
   var foo = 'foo'
   var result

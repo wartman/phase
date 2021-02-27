@@ -1,4 +1,4 @@
-package Test::Language::Packages {
+namespace Test::Language::Packages {
 
   // this is just testing to see if it compiles for now
 
