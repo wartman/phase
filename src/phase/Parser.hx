@@ -42,7 +42,7 @@ class Parser {
   function declaration(?annotation:Array<Expr>):Stmt {
     if (annotation == null) annotation = [];
     try {
-      if (match([ TokAt ])) return declaration(annotationList());
+      if (match([ TokLeftBracket ])) return declaration(annotationList());
       if (match([ TokVar ])) {
         if (annotation.length > 0) {
           error(previous(), 'Annotations are not allowed here');
@@ -433,7 +433,7 @@ class Parser {
       access.push(a);
     }
 
-    if (match([ TokAt ])) {
+    if (match([ TokLeftBracket ])) {
       annotation = annotationList();
     }
 
@@ -527,7 +527,12 @@ class Parser {
       }
       ignoreNewlines();
       annotation.push(new Expr.Annotation(path, params, absolute, null));
-    } while (match([ TokAt ]));
+    } while (match([ TokComma ]));
+    consume(TokRightBracket, "Expect a ']' at the end of an annotation");
+    ignoreNewlines();
+    if (match([ TokLeftBracket ])) {
+      annotation = annotation.concat(annotationList());
+    }
     return annotation;
   }
 
@@ -882,6 +887,7 @@ class Parser {
           consume(TokRightBrace, "Expect a '}'");
           ret;
         } else if (match([ TokTypeIdentifier, TokClass ])) {
+          trace('cls');
           new Expr.Variable(previous());
         } else {
           new Expr.Variable(consume(TokIdentifier, "Expect property name after '.'."));

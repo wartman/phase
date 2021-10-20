@@ -69,12 +69,12 @@ namespace My::Test {
     getThings() { 'things' }
   }
 
-  @Cool(type: 'sure is')
-  @Beans::Thing(
+  [Cool(type: 'sure is')]
+  [Beans::Thing(
     'yay',
     forEvery: 'meal',
     isPublic: false
-  )
+  )]
   class MyBar 
     extends Bar
     implements OtherTest
@@ -99,7 +99,7 @@ namespace My::Test {
       main()
     }
 
-    @Beans
+    [Beans]
     private getYo() { 
       return (
         1 + 

@@ -942,7 +942,7 @@ phase_Parser.prototype = {
 			annotation = [];
 		}
 		try {
-			if(this.match(["@"])) {
+			if(this.match(["["])) {
 				return this.declaration(this.annotationList());
 			}
 			if(this.match(["var"])) {
@@ -1310,7 +1310,7 @@ phase_Parser.prototype = {
 			}
 			access.push(a);
 		};
-		if(this.match(["@"])) {
+		if(this.match(["["])) {
 			annotation = this.annotationList();
 		}
 		while(this.match(["static","public","private","abstract"]) && !this.isAtEnd()) switch(this.previous().type) {
@@ -1383,9 +1383,14 @@ phase_Parser.prototype = {
 			}
 			this.ignoreNewlines();
 			annotation.push(new phase_Annotation(path,params,absolute,null));
-			if(!this.match(["@"])) {
+			if(!this.match([","])) {
 				break;
 			}
+		}
+		this.consume("]","Expect a ']' at the end of an annotation");
+		this.ignoreNewlines();
+		if(this.match(["["])) {
+			annotation = annotation.concat(this.annotationList());
 		}
 		return annotation;
 	}
@@ -1655,8 +1660,11 @@ phase_Parser.prototype = {
 					this.ignoreNewlines();
 					this.consume("}","Expect a '}'");
 					name = ret;
+				} else if(this.match(["[type-identifier]","class"])) {
+					console.log("src/phase/Parser.hx:890:","cls");
+					name = new phase_Variable(this.previous());
 				} else {
-					name = this.match(["[type-identifier]","class"]) ? new phase_Variable(this.previous()) : new phase_Variable(this.consume("[identifier]","Expect property name after '.'."));
+					name = new phase_Variable(this.consume("[identifier]","Expect property name after '.'."));
 				}
 				expr = new phase_Get(expr,name);
 			} else if(this.match(["["])) {
@@ -2509,8 +2517,8 @@ phase_PhpGenerator.prototype = {
 			var f = $bind(this,this.generateStmt);
 			var result = new Array(_this.length);
 			var _g2 = 0;
-			var _g3 = _this.length;
-			while(_g2 < _g3) {
+			var _g11 = _this.length;
+			while(_g2 < _g11) {
 				var i = _g2++;
 				result[i] = f(_this[i]);
 			}
@@ -3782,6 +3790,7 @@ phase_PhpGenerator.typeAliases = (function($this) {
 	_g.h["Int"] = "int";
 	_g.h["Array"] = "array";
 	_g.h["Callable"] = "callable";
+	_g.h["Any"] = "mixed";
 	_g.h["Scalar"] = "scalar";
 	$r = _g;
 	return $r;

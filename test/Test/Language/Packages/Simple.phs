@@ -7,8 +7,8 @@ namespace Test::Language::Packages {
   // Lowercase identifiers resolve to functions
   use My::Func::func
   use My::Funcs::{ funcA, funcB }
-  use My::Mixed::{ ClassA, funcA, ClassB, funcB }
+  use My::Mixed::{ ClassAA, funcAA, ClassAB, funcAB }
   use My::Func::func as other
-  use My::Classes::ClassA as Thing
+  use My::Classes::ClassAAA as Thing
 
 }

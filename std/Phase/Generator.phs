@@ -1,7 +1,17 @@
 namespace Phase {
 
   class Generator {
-    
+    private statements:Array
+    private reporter: ErrorReporter
+
+    new(
+      this.statements: Array,
+      this.reporter: ErrorReporter
+    ) {}
+
+    generate(): String {
+      return 'todo'
+    }
   }
 
 }

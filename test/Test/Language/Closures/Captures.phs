@@ -4,9 +4,9 @@ namespace Test::Language::Closures {
   
   var captures = {
     var bar = 'bar'
-    var one = { |thing| thing +++ foo }
-    var two = { 
-      return { one(bar) } 
+    var one = { |thing| foo +++ thing }
+    var two = {
+      return one(bar) 
     }
     return two()
   }

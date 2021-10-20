@@ -1,0 +1,21 @@
+namespace Test::Language::Classes {
+
+  use Attribute
+  use ReflectionClass;
+
+  [Attribute]
+  class FooAttr {
+    new(
+      this.foo: String
+    ) {}
+  }
+
+  [FooAttr(foo: 'foo')]
+  class Target {}
+
+  var rc = ReflectionClass(Target.class)
+  var attrs = rc.getAttributes()
+
+  ::Expect.that(attrs[0].getName(), 'Test\Language\Classes\FooAttr')
+  ::Expect.that(attrs[0].newInstance().foo, 'foo')
+}

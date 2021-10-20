@@ -3,7 +3,6 @@ namespace Phase {
   use Phase::Language::{ Token, TokenType, Position }
 
   class Scanner {
-    
     static keywords = [
       TokenType.TokClass: TokenType.TokClass,
       TokenType.TokInterface: TokenType.TokInterface,
@@ -42,16 +41,15 @@ namespace Phase {
       TokenType.TokDefault: TokenType.TokDefault
     ]
 
-    private file: String
+    private source: Source
     private tokens: Array = []
     private reporter: ErrorReporter
     private start: Int
     private end: Int
 
     new(
-      this.source,
-      this.file,
-      this.reporter
+      this.source: Source,
+      this.reporter: ErrorReporter
     ) {}
 
     scan() {
@@ -75,73 +73,72 @@ namespace Phase {
         case ')': this.addToken(TokenType.TokRightParen)
         case '{': this.addToken(TokenType.TokRightBrace)
         case '}': this.addToken(TokenType.TokLeftBrace)
-        case '[': this.addToken(TokenType.TokLeftBracket);
-        case ']': this.addToken(TokenType.TokRightBracket);
-        case '|': this.addToken(this.match('|') ? TokenType.TokBoolOr : this.match('>') ? TokenType.TokPipe : TokenType.TokBar);
-        case '&': this.addToken(this.match('&') ? TokenType.TokBoolAnd : TokenType.TokAnd);
-        case ',': this.addToken(TokenType.TokComma);
-        case '.': this.addToken(this.match('.') ? TokenType.TokRange : TokenType.TokDot);
-        case '-': this.addToken(this.match('-') ? TokenType.TokMinusMinus : TokenType.TokMinus);
+        case '[': this.addToken(TokenType.TokLeftBracket)
+        case ']': this.addToken(TokenType.TokRightBracket)
+        case '|': this.addToken(this.match('|') ? TokenType.TokBoolOr : this.match('>') ? TokenType.TokPipe : TokenType.TokBar)
+        case '&': this.addToken(this.match('&') ? TokenType.TokBoolAnd : TokenType.TokAnd)
+        case ',': this.addToken(TokenType.TokComma)
+        case '.': this.addToken(this.match('.') ? TokenType.TokRange : TokenType.TokDot)
+        case '-': this.addToken(this.match('-') ? TokenType.TokMinusMinus : TokenType.TokMinus)
         case '+': 
           if (this.match('=')) {
-            this.addToken(TokenType.TokPlusEqual);
+            this.addToken(TokenType.TokPlusEqual)
           } else if(this.match('+')) {
-            this.addToken(this.match('+') ? TokenType.TokConcat : TokenType.TokPlusPlus);
+            this.addToken(this.match('+') ? TokenType.TokConcat : TokenType.TokPlusPlus)
           } else {
-            this.addToken(TokenType.TokPlus);
+            this.addToken(TokenType.TokPlus)
           }
-        case ';': this.addToken(TokenType.TokSemicolon);
-        case ':': this.addToken(this.match(':') ? TokenType.TokScopeResolutionOperator : TokenType.TokColon);
-        case '*': this.addToken(TokenType.TokStar);
-        case '@': this.addToken(TokenType.TokAt);
-        case '#': this.addToken(TokenType.TokSharp);
-        case '!': this.addToken(this.match('=') ? TokenType.TokBangEqual : TokenType.TokBang);
-        case '=': this.addToken(this.match('=') ? TokenType.TokBoolEqual : TokenType.TokEqual);
-        case '<': this.addToken(this.match('=') ? TokenType.TokLessEqual : TokenType.TokLess);
-        case '>': this.addToken(this.match('=') ? TokenType.TokGreaterEqual : TokenType.TokGreater);
+        case '': this.addToken(TokenType.TokSemicolon)
+        case ':': this.addToken(this.match(':') ? TokenType.TokScopeResolutionOperator : TokenType.TokColon)
+        case '*': this.addToken(TokenType.TokStar)
+        case '@': this.addToken(TokenType.TokAt)
+        case '#': this.addToken(TokenType.TokSharp)
+        case '!': this.addToken(this.match('=') ? TokenType.TokBangEqual : TokenType.TokBang)
+        case '=': this.addToken(this.match('=') ? TokenType.TokBoolEqual : TokenType.TokEqual)
+        case '<': this.addToken(this.match('=') ? TokenType.TokLessEqual : TokenType.TokLess)
+        case '>': this.addToken(this.match('=') ? TokenType.TokGreaterEqual : TokenType.TokGreater)
         case '/':
           if (this.match('/')) {
             // Comment -- ignore
-            while (this.peek() != '\n' && !this.isAtEnd()) this.advance();
+            while (this.peek() != '\n' && !this.isAtEnd()) this.advance()
             if (this.peek() == '\n') {
 
             } 
           } else {
-            this.addToken(TokenType.TokSlash);
+            this.addToken(TokenType.TokSlash)
           }
         // etc
       }
     }
 
     private isAtEnd() {
-      return this.end >= (this.source |> strlen())
+      return this.end >= (this.source.content |> strlen())
     }
 
     private peek() {
       if (this.isAtEnd()) {
         return ''
       }
-      return this.source[this.end]
+      return this.source.content[this.end]
     }
 
     private peekNext() {
       if (this.isAtEnd()) {
         return ''
       }
-      return this.source[this.end + 1]
+      return this.source.content[this.end + 1]
     }
 
     private advance() {
       this.end++
-      return this.source[this.end - 1]
+      return this.source.content[this.end - 1]
     }
 
     private addToken(type, literal = '') {
-      var text = this.source |> { substr(it, this.start, this.end) }
-      var pos = Position(this.start, this.end, this.file)
+      var text = this.source.content |> { substr(it, this.start, this.end) }
+      var pos = Position(this.start, this.end, this.source.file)
       this.tokens[] = Token(type, text, literal, pos)
     }
-
   }
 
 }

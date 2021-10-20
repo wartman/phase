@@ -1,7 +1,7 @@
 package phase;
 
 class Token {
-
+  
   public var type:TokenType;
   public var lexeme:String;
   public var literal:Dynamic;

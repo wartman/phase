@@ -2,7 +2,7 @@ namespace Test::Language::Arrays {
 
   var foo = 'foo'
   var assoc = [
-    'a': 'b',
+    'a': 'a',
     foo: 'foo'
   ]
 

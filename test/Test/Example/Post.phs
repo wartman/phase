@@ -9,19 +9,18 @@ namespace Test::Example {
 
   /// An example of how Phase might work with something
   /// like Doctrine. 
-  @Entity()
+  [Entity]
   class Post {
     
-    @Id()
-    @Column(type: "integer")
-    @GeneratedValue()
+    [Id]
+    [Column(type: "integer")]
+    [GeneratedValue()]
     id: Int
 
-    @Id()
-    @Column(type: "string")
+    [Id, Column(type: "string")]
     name: String
 
-    @Column(type: "integer")
+    [Column(type: "integer")]
     date: Int
 
   }

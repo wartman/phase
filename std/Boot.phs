@@ -1,7 +1,6 @@
 namespace Phase {
 
   class Boot {
-
     static annotations = []
 
     static registerAnnotation(name, field, annotations) {
@@ -15,7 +14,6 @@ namespace Phase {
       }
       return static.annotations[name][field]
     }
-
   }
 
 }

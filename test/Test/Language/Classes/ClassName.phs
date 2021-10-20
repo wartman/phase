@@ -2,6 +2,6 @@ namespace Test::Language::Classes {
 
   class Foo {}
 
-  ::Expect.that(Foo.class, Foo |> get_class())
+  ::Expect.that(Foo.class, 'Test\Language\Classes\Foo')
 
 }

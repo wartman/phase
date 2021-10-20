@@ -1,3 +1,20 @@
 namespace Phase {
 
+  class Parser {
+    private tokens: Array
+    private statements: Array = []
+    private reporter: ErrorReporter
+
+    new(
+      this.tokens: Array,
+      this.reporter: ErrorReporter
+    ) {}
+
+    parse(): Array {
+      this.statements = []
+
+      return this.statements
+    }
+  }
+
 }

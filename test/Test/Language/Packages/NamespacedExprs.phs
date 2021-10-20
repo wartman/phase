@@ -1,7 +1,12 @@
 namespace Test::Language::Packages {
+  ::Expect.that(::Foo::Bar::Bin::foo('ok'), 'ok')
+  ::Expect.that(Bar::Bin::foo('ok'), 'ok!')
+}
 
-  // Just checking that it compiles
-  ::Foo::Bar::Bin::foo('ok')
-  Bar::Bin::foo('ok')
+namespace Foo::Bar::Bin {
+  function foo(str) { str }
+}
 
+namespace Test::Language::Packages::Bar::Bin {
+  function foo(str) { str +++ '!' }
 }

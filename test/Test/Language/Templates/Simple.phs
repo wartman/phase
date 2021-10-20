@@ -3,7 +3,7 @@ namespace Test::Language::Templates {
   var tpl = { |parts, placeholders|
     var out = ''
     for (i in 0..count(parts)) {
-      var value = placeholders[i - 1]
+      var value = if (i > 0) placeholders[i - 1] else null
       if (!value) {
         out = out +++ parts[i]
       } else {

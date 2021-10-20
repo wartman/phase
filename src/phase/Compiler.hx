@@ -39,7 +39,7 @@ class Compiler {
     }
   }
 
-  // Todo: this loding code is a mess. Come up with something less brittle.
+  // Todo: this loading code is a mess. Come up with something less brittle.
   //       Mostly this is to do with the wild way i decided to iterate
   //       over files.
   function compileDir(?dir:String, ?modules:Array<Module>):Array<Module> {

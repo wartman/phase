@@ -40,6 +40,7 @@ class PhpGenerator
     'Int' => 'int',
     'Array' => 'array',
     'Callable' => 'callable',
+    'Any' => 'mixed',
     'Scalar' => 'scalar'
   ];
 
@@ -617,9 +618,9 @@ class PhpGenerator
   }
 
   public function visitLiteralExpr(expr:Expr.Literal):String {
-    return if (Std.is(expr.value, Int)) 
+    return if (Std.isOfType(expr.value, Int)) 
       expr.value;
-    else if (Std.is(expr.value, Bool))
+    else if (Std.isOfType(expr.value, Bool))
       expr.value;
     else if (expr.value == null)
       return 'null';
