@@ -13,7 +13,7 @@ enum GeneratorMode {
   GeneratingFunction;
 }
 
-enum abstract GeneratorAnnotationStrategy(String) from String {
+enum abstract GeneratorAttributeStrategy(String) from String {
   var AnnotatePhase = 'phase';
   var AnnotateDocblock = 'docblock';
   var AnnotatePhpAttribute = 'attribute';
@@ -26,7 +26,7 @@ enum abstract PhpVersion(String) from String {
 }
 
 typedef PhpGeneratorOptions = {
-  ?annotation: GeneratorAnnotationStrategy,
+  ?attribute: GeneratorAttributeStrategy,
   ?version: PhpVersion
 };
 
@@ -68,8 +68,8 @@ class PhpGenerator
     if (this.options.version == null) {
       this.options.version = Php8;
     }
-    if (this.options.annotation == null) {
-      this.options.annotation = switch this.options.version {
+    if (this.options.attribute == null) {
+      this.options.attribute = switch this.options.version {
         case Php7: AnnotateOnClass;
         case Php8: AnnotatePhpAttribute;
       }
@@ -160,7 +160,7 @@ class PhpGenerator
   }
 
   public function visitUseStmt(stmt:Stmt.Use):String {
-    // todo: handle annotations
+    // todo: handle attributes
     var path = stmt.path.map(t -> t.lexeme).join('\\');
     if (stmt.absolute) path = '\\' + path;
 
@@ -190,9 +190,10 @@ class PhpGenerator
 
   public function visitClassStmt(stmt:Stmt.Class):String {
     var out = '';
+    var props:Array<String> = [];
     
-    if (stmt.annotation.length > 0) {
-      out += generateAnnotations({ cls: stmt }, stmt.annotation);
+    if (stmt.attribute.length > 0) {
+      out += generateAttributes({ cls: stmt }, stmt.attribute);
     }
 
     var keyword = switch stmt.kind {
@@ -229,13 +230,35 @@ class PhpGenerator
     }
 
     for (field in stmt.fields) {
-      if (field.annotation.length > 0) {
-        out += generateAnnotations({
+      if (field.attribute.length > 0) {
+        out += generateAttributes({
           cls: stmt,
           field: field.name.lexeme
-        }, field.annotation);
+        }, field.attribute);
+      }
+      switch field.kind {
+        case FProp(_, _, _):
+          props.push(safeVar(field.name));
+        default:
       }
       out += generateStmt(field) + '\n';
+    }
+
+    if (props.length > 0) {
+      // Todo: this is iffy -- make better
+      out += '\n' + getIndent() + "public function __get($prop)";
+      out += '\n' + getIndent() + "{";
+      indent();
+      out += '\n' + getIndent() + "return $this->{'__get_' . $prop}();";
+      outdent();
+      out += '\n' + getIndent() + "}";
+      out += '\n';
+      out += '\n' + getIndent() + "public function __set($prop, $value)";
+      out += '\n' + getIndent() + "{";
+      indent();
+      out += '\n' + getIndent() + "$this->{'__set_' . $prop}($value);";
+      outdent();
+      out += '\n' + getIndent() + "}";
     }
 
     mode = prevMode;
@@ -247,7 +270,7 @@ class PhpGenerator
   
   public function visitFieldStmt(stmt:Stmt.Field):String {
     var isConst:Bool = false;
-    return '\n' + getIndent() + stmt.access.map(a -> switch a {
+    var access = '\n' + getIndent() + stmt.access.map(a -> switch a {
       case AStatic: 'static';
       case APublic: 'public';
       case APrivate: 'protected';
@@ -255,9 +278,11 @@ class PhpGenerator
         isConst = true;
         'const';
       case AAbstract: mode == GeneratingInterface ? null : 'abstract';
-    }).filter(f -> f != null).join(' ') + switch stmt.kind {
+    }).filter(f -> f != null).join(' ');
+    
+    return switch stmt.kind {
       case FVar(v, t):
-        var out = switch options.version {
+        var out = access + switch options.version {
           case Php8 if (t != null && !isConst): ' ' + generateTypePath(t);
           default: '';
         }
@@ -268,6 +293,21 @@ class PhpGenerator
           out += ' = ' + generateExpr(v.initializer);
         }
         out + ';';
+      case FProp(getter, setter, type):
+        var name = safeVar(stmt.name);
+        var ret = type != null ? ':' + generateTypePath(type) : '';
+        var out = '';
+        if (getter != null) {
+          scope.push();
+          out += access + ' function __get_$name()$ret \n' + generateStmt(getter.body);
+          scope.pop();
+        }
+        if (setter != null) {
+          scope.push();
+          out += access + ' function __set_$name(' + functionParams(setter.params) + ') \n' + generateStmt(setter.body);
+          scope.pop();
+        }
+        out;
       case FUse(type):
         'use ' + generateTypePath(type) + ';';
       case FFun(fun):
@@ -277,7 +317,7 @@ class PhpGenerator
         
         scope.push();
 
-        var out = ' function ' + name + '(' + functionParams(fun.params) + ')';
+        var out = access + ' function ' + name + '(' + functionParams(fun.params) + ')';
         if (fun.ret != null) {
           out += ':' + generateTypePath(fun.ret);
         }
@@ -424,19 +464,19 @@ class PhpGenerator
     return out;
   }
 
-  public function visitAnnotationExpr(expr:Expr.Annotation):String {
+  public function visitAttributeExpr(expr:Expr.Attribute):String {
     var name = expr.path.map(t -> t.lexeme).join('\\');
     function generateArg(arg:Expr.CallArgument) return switch arg {
       case Positional(expr): generateExpr(expr);
       case Named(name, expr): '${name}: ${generateExpr(expr)}';
     }
-    return switch options.annotation {
+    return switch options.attribute {
       case AnnotateDocblock: 
         '@' + name + '('  + expr.params.map(generateArg).join(', ') + ')';
       case AnnotatePhpAttribute: 
         name + '('  + expr.params.map(generateArg).join(', ') + ')';
       case AnnotatePhase | AnnotateOnClass:
-        var tmp = tempVar('annotation');
+        var tmp = tempVar('attribute');
         indent();
         var out = '';
         out = getIndent() + '$' + tmp + ' = new ' + name + '(' + expr.params.map(generateArg).join(', ') + ');\n' + out;
@@ -695,16 +735,16 @@ class PhpGenerator
     return type;
   }
 
-  function generateAnnotations(target:{
+  function generateAttributes(target:{
     cls:Stmt.Class,
     ?field:String
-  }, annotations:Array<Expr>):String {
+  }, attributes:Array<Expr>):String {
     var clsName = target.cls.name.lexeme;
     
-    if (options.annotation == AnnotateOnClass) {
-      if (!target.cls.fields.exists(f -> f.name.lexeme == '__annotations__')) {
+    if (options.attribute == AnnotateOnClass) {
+      if (!target.cls.fields.exists(f -> f.name.lexeme == '__attributes__')) {
         var pos = target.cls.name.pos;
-        var tok = new Token(TokIdentifier, '__annotations__', '', pos);
+        var tok = new Token(TokIdentifier, '__attributes__', '', pos);
         target.cls.fields.push(new Stmt.Field(
           tok,
           FVar(new Stmt.Var(tok, new Expr.ArrayLiteral(tok, [])), null),
@@ -714,34 +754,34 @@ class PhpGenerator
       }
     }
 
-    return switch options.annotation {
+    return switch options.attribute {
       case AnnotateDocblock:
         var out = '\n' + getIndent() + '/**';
-        for (a in annotations) {
+        for (a in attributes) {
           out += '\n' + getIndent() + ' * ' + generateExpr(a);
         }
         out += '\n' + getIndent() + ' */';
       case AnnotatePhpAttribute:
         var out = '';
-        for (a in annotations) {
+        for (a in attributes) {
           out += '\n' + getIndent() + '#[' + generateExpr(a) + ']';
         }
         out;
       case AnnotatePhase:
         var kind = target.field == null ? '__CLASS__' : target.field;
-        var reg = '\\Phase\\Boot::registerAnnotation($clsName::class, "$kind", '
+        var reg = '\\Phase\\Boot::registerAttribute($clsName::class, "$kind", '
           + visitArrayLiteralExpr(new Expr.ArrayLiteral(
             target.cls.name,
-            annotations
+            attributes
           )) + ');';
         append.push(reg);
         '';
       case AnnotateOnClass:
         var kind = target.field == null ? '__CLASS__' : target.field;
-        var reg = '$clsName::$$__annotations__["$kind"] = '
+        var reg = '$clsName::$$__attributes__["$kind"] = '
           + visitArrayLiteralExpr(new Expr.ArrayLiteral(
             target.cls.name,
-            annotations
+            attributes
           )) + ';';
         append.push(reg);
         '';

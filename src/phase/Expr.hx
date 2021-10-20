@@ -5,7 +5,7 @@ interface Expr {
   public function accept<T>(visitor:ExprVisitor<T>):T;
 }
 
-class Annotation implements Expr {
+class Attribute implements Expr {
   var path:Array<Token>;
   var params:Array<CallArgument>;
   var relative:Bool;

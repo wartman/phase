@@ -1,3 +1,3 @@
 #!/bin/bash
-node ./bin/phase.js ./test ./dist/test
-# todo: actually run tests :V
+php ./dist/phase/index.php ./test ./dist/test
+php ./test.php

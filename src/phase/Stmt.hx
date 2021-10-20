@@ -24,13 +24,13 @@ class Use implements Stmt {
   var path:Array<Token>;
   var absolute:Bool;
   var kind:UseKind;
-  var annotation:Array<Expr>;
+  var attribute:Array<Expr>;
 }
 
 class Namespace implements Stmt {
   var path:Array<Token>;
   var decls:Array<Stmt>;
-  var annotation:Array<Expr>;
+  var attribute:Array<Expr>;
 }
 
 class Var implements Stmt {
@@ -103,7 +103,7 @@ class Function implements Stmt {
   var params:Array<FunctionArg>;
   var body:Stmt;
   var ret:Expr.Type;
-  var annotation:Array<Expr>;
+  var attribute:Array<Expr>;
 }
 
 class Return implements Stmt {
@@ -114,6 +114,7 @@ class Return implements Stmt {
 enum FieldKind {
   FUse(type:Expr.Type); // Note: will need to add all the complex trait stuff at some point.
   FVar(v:Var, type:Expr.Type);
+  FProp(getter:Null<Function>, setter:Null<Function>, type:Expr.Type);
   FFun(fun:Function);
 }
 
@@ -129,7 +130,7 @@ class Field implements Stmt {
   var name:Token;
   var kind:FieldKind;
   var access:Array<FieldAccess>;
-  var annotation:Array<Expr>;
+  var attribute:Array<Expr>;
 }
 
 enum ClassKind {
@@ -144,5 +145,5 @@ class Class implements Stmt {
   var superclass:Token;
   var interfaces:Array<Token>;
   var fields:Array<Field>;
-  var annotation:Array<Expr>;
+  var attribute:Array<Expr>;
 }

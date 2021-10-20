@@ -570,18 +570,18 @@ js_node_url_URLSearchParamsEntry.get_name = function(this1) {
 js_node_url_URLSearchParamsEntry.get_value = function(this1) {
 	return this1[1];
 };
-var phase_Annotation = function(path,params,relative,expr) {
+var phase_Attribute = function(path,params,relative,expr) {
 	this.path = path;
 	this.params = params;
 	this.relative = relative;
 	this.expr = expr;
 };
-phase_Annotation.__name__ = true;
-phase_Annotation.prototype = {
+phase_Attribute.__name__ = true;
+phase_Attribute.prototype = {
 	accept: function(visitor) {
-		return visitor.visitAnnotationExpr(this);
+		return visitor.visitAttributeExpr(this);
 	}
-	,__class__: phase_Annotation
+	,__class__: phase_Attribute
 };
 var phase_Assign = function(name,value) {
 	this.name = name;
@@ -852,7 +852,7 @@ phase_NodeCompiler.compile = $hx_exports["compile"] = function(src,options,relat
 		relative = haxe_io_Path.normalize(src);
 	}
 	if(options == null) {
-		options = { annotation : "on-class"};
+		options = { attribute : "on-class"};
 	}
 	var _g = [];
 	var _g1 = 0;
@@ -937,46 +937,46 @@ phase_Parser.prototype = {
 		}
 		return stmts;
 	}
-	,declaration: function(annotation) {
-		if(annotation == null) {
-			annotation = [];
+	,declaration: function(attribute) {
+		if(attribute == null) {
+			attribute = [];
 		}
 		try {
 			if(this.match(["["])) {
-				return this.declaration(this.annotationList());
+				return this.declaration(this.attributeList());
 			}
 			if(this.match(["var"])) {
-				if(annotation.length > 0) {
-					this.error(this.previous(),"Annotations are not allowed here");
+				if(attribute.length > 0) {
+					this.error(this.previous(),"Attributes are not allowed here");
 				}
 				return this.varDeclaration();
 			}
 			if(this.match(["global"])) {
-				if(annotation.length > 0) {
-					this.error(this.previous(),"Annotations are not allowed here");
+				if(attribute.length > 0) {
+					this.error(this.previous(),"Attributes are not allowed here");
 				}
 				return this.globalDeclaration();
 			}
 			if(this.match(["function"])) {
-				return this.functionDeclaration(false,annotation);
+				return this.functionDeclaration(false,attribute);
 			}
 			if(this.match(["enum"])) {
-				return this.enumDeclaration(annotation);
+				return this.enumDeclaration(attribute);
 			}
 			if(this.match(["interface"])) {
-				return this.interfaceDeclaration(annotation);
+				return this.interfaceDeclaration(attribute);
 			}
 			if(this.match(["trait"])) {
-				return this.traitDeclaration(annotation);
+				return this.traitDeclaration(attribute);
 			}
 			if(this.match(["class"])) {
-				return this.classDeclaration(annotation);
+				return this.classDeclaration(attribute);
 			}
 			if(this.match(["use"])) {
-				return this.useDeclaration(annotation);
+				return this.useDeclaration(attribute);
 			}
 			if(this.match(["namespace"])) {
-				return this.packageDeclaration(annotation);
+				return this.packageDeclaration(attribute);
 			}
 			return this.statement();
 		} catch( _g ) {
@@ -1015,7 +1015,7 @@ phase_Parser.prototype = {
 		}
 		return this.expressionStatement();
 	}
-	,packageDeclaration: function(annotation) {
+	,packageDeclaration: function(attribute) {
 		var _gthis = this;
 		if(this.inNamespace) {
 			this.error(this.previous(),"Namespaces cannot be nested");
@@ -1031,9 +1031,9 @@ phase_Parser.prototype = {
 		this.consume("}","Expect `}` at the end of a package declaration.");
 		this.ignoreNewlines();
 		this.inNamespace = false;
-		return new phase_Namespace(path,decls,annotation);
+		return new phase_Namespace(path,decls,attribute);
 	}
-	,useDeclaration: function(annotation) {
+	,useDeclaration: function(attribute) {
 		var _gthis = this;
 		if(!this.inNamespace) {
 			this.error(this.previous(),"`use` is not allowed outside a namespace");
@@ -1096,7 +1096,7 @@ phase_Parser.prototype = {
 			}
 		}
 		this.expectEndOfStatement();
-		return new phase_Use(path,absolute,kind,annotation);
+		return new phase_Use(path,absolute,kind,attribute);
 	}
 	,varDeclaration: function() {
 		var name = this.consume("[identifier]","Expect variable name.");
@@ -1112,9 +1112,9 @@ phase_Parser.prototype = {
 		this.expectEndOfStatement();
 		return new phase_Global(name);
 	}
-	,functionDef: function(isAnnon,annotations) {
-		if(annotations == null) {
-			annotations = [];
+	,functionDef: function(isAnnon,attributes) {
+		if(attributes == null) {
+			attributes = [];
 		}
 		var name;
 		if(!isAnnon || this.check("[identifier]")) {
@@ -1127,7 +1127,7 @@ phase_Parser.prototype = {
 		var ret = this.typeHint();
 		this.consume("{","Expect '{' before function body");
 		var body = this.functionBody();
-		return new phase_Function(name,params,body,ret,annotations);
+		return new phase_Function(name,params,body,ret,attributes);
 	}
 	,functionParams: function(allowInit) {
 		if(allowInit == null) {
@@ -1172,15 +1172,15 @@ phase_Parser.prototype = {
 		}
 		return new phase_Block(body);
 	}
-	,functionDeclaration: function(isInline,annotations) {
+	,functionDeclaration: function(isInline,attributes) {
 		if(isInline == null) {
 			isInline = false;
 		}
-		var def = this.functionDef(isInline,annotations);
+		var def = this.functionDef(isInline,attributes);
 		this.ignoreNewlines();
 		return def;
 	}
-	,interfaceDeclaration: function(annotation) {
+	,interfaceDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect a class name. Must start uppercase.");
 		var interfaces = [];
 		var fields = [];
@@ -1198,9 +1198,9 @@ phase_Parser.prototype = {
 		this.ignoreNewlines();
 		this.consume("}","Expect '}' at end of interface body");
 		this.ignoreNewlines();
-		return new phase_Class(name,phase_ClassKind.KindInterface,null,interfaces,fields,annotation);
+		return new phase_Class(name,phase_ClassKind.KindInterface,null,interfaces,fields,attribute);
 	}
-	,traitDeclaration: function(annotation) {
+	,traitDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect a trait name. Must start uppercase.");
 		var fields = [];
 		this.consume("{","Expect '{' before trait body.");
@@ -1212,9 +1212,9 @@ phase_Parser.prototype = {
 		this.ignoreNewlines();
 		this.consume("}","Expect '}' at end of trait body");
 		this.ignoreNewlines();
-		return new phase_Class(name,phase_ClassKind.KindTrait,null,[],fields,annotation);
+		return new phase_Class(name,phase_ClassKind.KindTrait,null,[],fields,attribute);
 	}
-	,enumDeclaration: function(annotation) {
+	,enumDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect an enum name. Must start uppercase.");
 		var fields = [];
 		this.consume("{","Expect '{' before trait body.");
@@ -1231,9 +1231,9 @@ phase_Parser.prototype = {
 		this.ignoreNewlines();
 		this.consume("}","Expect '}' at end of trait body");
 		this.ignoreNewlines();
-		return new phase_Class(name,phase_ClassKind.KindClass,null,[],fields,annotation);
+		return new phase_Class(name,phase_ClassKind.KindClass,null,[],fields,attribute);
 	}
-	,classDeclaration: function(annotation) {
+	,classDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect a class name. Must start uppercase.");
 		var superclass = null;
 		var interfaces = [];
@@ -1261,7 +1261,7 @@ phase_Parser.prototype = {
 			var field = this.fieldDeclaration();
 			fields.push(field);
 			var _g = field.kind;
-			if(_g._hx_index == 2) {
+			if(_g._hx_index == 3) {
 				var func = _g.fun;
 				var _g1 = 0;
 				var _g2 = func.params;
@@ -1281,7 +1281,7 @@ phase_Parser.prototype = {
 		this.ignoreNewlines();
 		this.consume("}","Expect '}' at end of class body");
 		this.ignoreNewlines();
-		return new phase_Class(name,phase_ClassKind.KindClass,superclass,interfaces,fields,annotation);
+		return new phase_Class(name,phase_ClassKind.KindClass,superclass,interfaces,fields,attribute);
 	}
 	,fieldDeclaration: function(options) {
 		var _gthis = this;
@@ -1303,7 +1303,7 @@ phase_Parser.prototype = {
 			return out;
 		}
 		var access = options.access;
-		var annotation = [];
+		var attribute = [];
 		var addAccess = function(a) {
 			if(Lambda.has(access,a)) {
 				_gthis.error(_gthis.previous(),"Only one `" + Std.string(a) + "` declaration is allowed per field");
@@ -1311,7 +1311,7 @@ phase_Parser.prototype = {
 			access.push(a);
 		};
 		if(this.match(["["])) {
-			annotation = this.annotationList();
+			attribute = this.attributeList();
 		}
 		while(this.match(["static","public","private","abstract"]) && !this.isAtEnd()) switch(this.previous().type) {
 		case "abstract":
@@ -1338,7 +1338,40 @@ phase_Parser.prototype = {
 		}
 		if(this.match(["[newline]"])) {
 			this.ignoreNewlines();
-			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,null),type),access,annotation);
+			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,null),type),access,attribute);
+		}
+		if(this.match(["{"])) {
+			var getter = null;
+			var setter = null;
+			while(!this.check("}") && !this.isAtEnd()) {
+				this.ignoreNewlines();
+				var mode = this.consume("[identifier]","Expected an identifier");
+				switch(mode.lexeme) {
+				case "get":
+					if(getter != null) {
+						throw haxe_Exception.thrown(this.error(mode,"`get` already defined"));
+					}
+					this.consume("{","expected a `{`");
+					var body = this.functionBody();
+					this.expectEndOfStatement();
+					getter = new phase_Function(mode,[],body,type,[]);
+					break;
+				case "set":
+					if(setter != null) {
+						throw haxe_Exception.thrown(this.error(mode,"`set` already defined"));
+					}
+					this.consume("{","expected a `{`");
+					var body1 = this.functionBody();
+					this.expectEndOfStatement();
+					setter = new phase_Function(mode,[{ name : new phase_Token("[identifier]","value","value",this.previous().pos), type : type, expr : null}],body1,type,[]);
+					break;
+				default:
+					throw haxe_Exception.thrown(this.error(mode,"Expected `get` or `set`"));
+				}
+			}
+			this.ignoreNewlines();
+			this.consume("}","Expected a `}`");
+			return new phase_Field(name,phase_FieldKind.FProp(getter,setter,type),access,attribute);
 		}
 		if(this.match(["="])) {
 			if(Lambda.has(access,phase_FieldAccess.AAbstract)) {
@@ -1347,7 +1380,7 @@ phase_Parser.prototype = {
 			this.ignoreNewlines();
 			var expr = this.expression();
 			this.expectEndOfStatement();
-			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,expr),type),access,annotation);
+			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,expr),type),access,attribute);
 		}
 		this.consume("(","Expect '(' after function name.");
 		var params = this.functionParams(name.lexeme == "new");
@@ -1360,11 +1393,11 @@ phase_Parser.prototype = {
 			body = this.functionBody();
 			this.expectEndOfStatement();
 		}
-		return new phase_Field(name,phase_FieldKind.FFun(new phase_Function(name,params,body,ret,[])),access,annotation);
+		return new phase_Field(name,phase_FieldKind.FFun(new phase_Function(name,params,body,ret,[])),access,attribute);
 	}
-	,annotationList: function() {
+	,attributeList: function() {
 		var _gthis = this;
-		var annotation = [];
+		var attribute = [];
 		while(true) {
 			var absolute = false;
 			if(this.match(["::"])) {
@@ -1379,20 +1412,20 @@ phase_Parser.prototype = {
 					params = this.parseArguments();
 				}
 				this.ignoreNewlines();
-				this.consume(")","Expect ')' at the end of an annotation");
+				this.consume(")","Expect ')' at the end of an attribute");
 			}
 			this.ignoreNewlines();
-			annotation.push(new phase_Annotation(path,params,absolute,null));
+			attribute.push(new phase_Attribute(path,params,absolute,null));
 			if(!this.match([","])) {
 				break;
 			}
 		}
-		this.consume("]","Expect a ']' at the end of an annotation");
+		this.consume("]","Expect a ']' at the end of an attribute");
 		this.ignoreNewlines();
 		if(this.match(["["])) {
-			annotation = annotation.concat(this.annotationList());
+			attribute = attribute.concat(this.attributeList());
 		}
-		return annotation;
+		return attribute;
 	}
 	,throwStatement: function() {
 		var value = this.expression();
@@ -1660,11 +1693,8 @@ phase_Parser.prototype = {
 					this.ignoreNewlines();
 					this.consume("}","Expect a '}'");
 					name = ret;
-				} else if(this.match(["[type-identifier]","class"])) {
-					console.log("src/phase/Parser.hx:890:","cls");
-					name = new phase_Variable(this.previous());
 				} else {
-					name = new phase_Variable(this.consume("[identifier]","Expect property name after '.'."));
+					name = this.match(["[type-identifier]","class"]) ? new phase_Variable(this.previous()) : new phase_Variable(this.consume("[identifier]","Expect property name after '.'."));
 				}
 				expr = new phase_Get(expr,name);
 			} else if(this.match(["["])) {
@@ -2066,7 +2096,7 @@ var phase_PhpGenerator = function(stmts,reporter,options) {
 	if(this.options.version == null) {
 		this.options.version = "8";
 	}
-	if(this.options.annotation == null) {
+	if(this.options.attribute == null) {
 		var tmp;
 		switch(this.options.version) {
 		case "7":
@@ -2076,7 +2106,7 @@ var phase_PhpGenerator = function(stmts,reporter,options) {
 			tmp = "attribute";
 			break;
 		}
-		this.options.annotation = tmp;
+		this.options.attribute = tmp;
 	}
 };
 phase_PhpGenerator.__name__ = true;
@@ -2250,8 +2280,9 @@ phase_PhpGenerator.prototype = {
 	}
 	,visitClassStmt: function(stmt) {
 		var out = "";
-		if(stmt.annotation.length > 0) {
-			out += this.generateAnnotations({ cls : stmt},stmt.annotation);
+		var props = [];
+		if(stmt.attribute.length > 0) {
+			out += this.generateAttributes({ cls : stmt},stmt.attribute);
 		}
 		var keyword;
 		switch(stmt.kind._hx_index) {
@@ -2316,10 +2347,32 @@ phase_PhpGenerator.prototype = {
 		while(_g < _g1.length) {
 			var field = _g1[_g];
 			++_g;
-			if(field.annotation.length > 0) {
-				out += this.generateAnnotations({ cls : stmt, field : field.name.lexeme},field.annotation);
+			if(field.attribute.length > 0) {
+				out += this.generateAttributes({ cls : stmt, field : field.name.lexeme},field.attribute);
+			}
+			var _g2 = field.kind;
+			if(_g2._hx_index == 2) {
+				var _g3 = _g2.getter;
+				var _g4 = _g2.setter;
+				var _g5 = _g2.type;
+				props.push(this.safeVar(field.name));
 			}
 			out += this.generateStmt(field) + "\n";
+		}
+		if(props.length > 0) {
+			out += "\n" + this.getIndent() + "public function __get($prop)";
+			out += "\n" + this.getIndent() + "{";
+			this.indent();
+			out += "\n" + this.getIndent() + "return $this->{'__get_' . $prop}();";
+			this.outdent();
+			out += "\n" + this.getIndent() + "}";
+			out += "\n";
+			out += "\n" + this.getIndent() + "public function __set($prop, $value)";
+			out += "\n" + this.getIndent() + "{";
+			this.indent();
+			out += "\n" + this.getIndent() + "$this->{'__set_' . $prop}($value);";
+			this.outdent();
+			out += "\n" + this.getIndent() + "}";
 		}
 		this.mode = prevMode;
 		this.scope.pop();
@@ -2329,33 +2382,33 @@ phase_PhpGenerator.prototype = {
 	,visitFieldStmt: function(stmt) {
 		var _gthis = this;
 		var isConst = false;
-		var tmp = "\n" + this.getIndent();
+		var access = "\n" + this.getIndent();
 		var _this = stmt.access;
 		var result = new Array(_this.length);
 		var _g = 0;
 		var _g1 = _this.length;
 		while(_g < _g1) {
 			var i = _g++;
-			var tmp1;
+			var access1;
 			switch(_this[i]._hx_index) {
 			case 0:
-				tmp1 = "static";
+				access1 = "static";
 				break;
 			case 1:
-				tmp1 = "public";
+				access1 = "public";
 				break;
 			case 2:
-				tmp1 = "protected";
+				access1 = "protected";
 				break;
 			case 3:
-				tmp1 = _gthis.mode == phase_GeneratorMode.GeneratingInterface ? null : "abstract";
+				access1 = _gthis.mode == phase_GeneratorMode.GeneratingInterface ? null : "abstract";
 				break;
 			case 4:
 				isConst = true;
-				tmp1 = "const";
+				access1 = "const";
 				break;
 			}
-			result[i] = tmp1;
+			result[i] = access1;
 		}
 		var _g = [];
 		var _g1 = 0;
@@ -2367,30 +2420,45 @@ phase_PhpGenerator.prototype = {
 				_g.push(v);
 			}
 		}
-		var tmp1 = tmp + _g.join(" ");
+		var access1 = access + _g.join(" ");
 		var _g = stmt.kind;
-		var tmp;
 		switch(_g._hx_index) {
 		case 0:
 			var type = _g.type;
-			tmp = "use " + this.generateTypePath(type) + ";";
-			break;
+			return "use " + this.generateTypePath(type) + ";";
 		case 1:
 			var v = _g.v;
 			var t = _g.type;
 			var _g1 = this.options.version;
-			var out = _g1 == null ? "" : _g1 == "8" ? t != null && !isConst ? " " + this.generateTypePath(t) : "" : "";
+			var out = access1 + (_g1 == null ? "" : _g1 == "8" ? t != null && !isConst ? " " + this.generateTypePath(t) : "" : "");
 			out += isConst ? " " + this.safeVar(stmt.name) : " $" + this.safeVar(stmt.name);
 			if(v.initializer != null) {
 				out += " = " + this.generateExpr(v.initializer);
 			}
-			tmp = out + ";";
-			break;
+			return out + ";";
 		case 2:
+			var getter = _g.getter;
+			var setter = _g.setter;
+			var type = _g.type;
+			var name = this.safeVar(stmt.name);
+			var ret = type != null ? ":" + this.generateTypePath(type) : "";
+			var out = "";
+			if(getter != null) {
+				this.scope.push();
+				out += access1 + (" function __get_" + name + "()" + ret + " \n") + this.generateStmt(getter.body);
+				this.scope.pop();
+			}
+			if(setter != null) {
+				this.scope.push();
+				out += access1 + (" function __set_" + name + "(") + this.functionParams(setter.params) + ") \n" + this.generateStmt(setter.body);
+				this.scope.pop();
+			}
+			return out;
+		case 3:
 			var fun = _g.fun;
 			var name = stmt.name.lexeme == "new" ? "__construct" : this.safeVar(stmt.name);
 			this.scope.push();
-			var out = " function " + name + "(" + this.functionParams(fun.params) + ")";
+			var out = access1 + " function " + name + "(" + this.functionParams(fun.params) + ")";
 			if(fun.ret != null) {
 				out += ":" + this.generateTypePath(fun.ret);
 			}
@@ -2411,10 +2479,8 @@ phase_PhpGenerator.prototype = {
 				out += ";";
 			}
 			this.scope.pop();
-			tmp = out;
-			break;
+			return out;
 		}
-		return tmp1 + tmp;
 	}
 	,visitFunctionStmt: function(stmt) {
 		this.scope.define(this.safeVar(stmt.name),phase_PhpKind.PhpFun);
@@ -2530,7 +2596,7 @@ phase_PhpGenerator.prototype = {
 		out += this.getIndent() + "}";
 		return out;
 	}
-	,visitAnnotationExpr: function(expr) {
+	,visitAttributeExpr: function(expr) {
 		var _gthis = this;
 		var _this = expr.path;
 		var result = new Array(_this.length);
@@ -2552,7 +2618,7 @@ phase_PhpGenerator.prototype = {
 				return "" + name + ": " + _gthis.generateExpr(expr);
 			}
 		};
-		switch(this.options.annotation) {
+		switch(this.options.attribute) {
 		case "attribute":
 			var tmp = name + "(";
 			var _this = expr.params;
@@ -2578,7 +2644,7 @@ phase_PhpGenerator.prototype = {
 			}
 			return tmp + result.join(", ") + ")";
 		case "on-class":case "phase":
-			var tmp = this.tempVar("annotation");
+			var tmp = this.tempVar("attribute");
 			this.indent();
 			var out = "";
 			var out1 = this.getIndent() + "$" + tmp + " = new " + name + "(";
@@ -2865,23 +2931,23 @@ phase_PhpGenerator.prototype = {
 		}
 		return type;
 	}
-	,generateAnnotations: function(target,annotations) {
+	,generateAttributes: function(target,attributes) {
 		var clsName = target.cls.name.lexeme;
-		if(this.options.annotation == "on-class") {
+		if(this.options.attribute == "on-class") {
 			if(!Lambda.exists(target.cls.fields,function(f) {
-				return f.name.lexeme == "__annotations__";
+				return f.name.lexeme == "__attributes__";
 			})) {
 				var pos = target.cls.name.pos;
-				var tok = new phase_Token("[identifier]","__annotations__","",pos);
+				var tok = new phase_Token("[identifier]","__attributes__","",pos);
 				target.cls.fields.push(new phase_Field(tok,phase_FieldKind.FVar(new phase_Var(tok,new phase_ArrayLiteral(tok,[])),null),[phase_FieldAccess.APublic,phase_FieldAccess.AStatic],[]));
 			}
 		}
-		switch(this.options.annotation) {
+		switch(this.options.attribute) {
 		case "attribute":
 			var out = "";
 			var _g = 0;
-			while(_g < annotations.length) {
-				var a = annotations[_g];
+			while(_g < attributes.length) {
+				var a = attributes[_g];
 				++_g;
 				out += "\n" + this.getIndent() + "#[" + this.generateExpr(a) + "]";
 			}
@@ -2889,8 +2955,8 @@ phase_PhpGenerator.prototype = {
 		case "docblock":
 			var out = "\n" + this.getIndent() + "/**";
 			var _g = 0;
-			while(_g < annotations.length) {
-				var a = annotations[_g];
+			while(_g < attributes.length) {
+				var a = attributes[_g];
 				++_g;
 				out += "\n" + this.getIndent() + " * " + this.generateExpr(a);
 			}
@@ -2898,12 +2964,12 @@ phase_PhpGenerator.prototype = {
 			return out;
 		case "on-class":
 			var kind = target.field == null ? "__CLASS__" : target.field;
-			var reg = "" + clsName + "::$" + "__annotations__[\"" + kind + "\"] = " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,annotations)) + ";";
+			var reg = "" + clsName + "::$" + "__attributes__[\"" + kind + "\"] = " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes)) + ";";
 			this.append.push(reg);
 			return "";
 		case "phase":
 			var kind = target.field == null ? "__CLASS__" : target.field;
-			var reg = "\\Phase\\Boot::registerAnnotation(" + clsName + "::class, \"" + kind + "\", " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,annotations)) + ");";
+			var reg = "\\Phase\\Boot::registerAttribute(" + clsName + "::class, \"" + kind + "\", " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes)) + ");";
 			this.append.push(reg);
 			return "";
 		}
@@ -3326,11 +3392,11 @@ var phase_UseKind = $hxEnums["phase.UseKind"] = { __ename__:true,__constructs__:
 	,UseSub: ($_=function(items) { return {_hx_index:2,items:items,__enum__:"phase.UseKind",toString:$estr}; },$_._hx_name="UseSub",$_.__params__ = ["items"],$_)
 };
 phase_UseKind.__constructs__ = [phase_UseKind.UseNormal,phase_UseKind.UseAlias,phase_UseKind.UseSub];
-var phase_Use = function(path,absolute,kind,annotation) {
+var phase_Use = function(path,absolute,kind,attribute) {
 	this.path = path;
 	this.absolute = absolute;
 	this.kind = kind;
-	this.annotation = annotation;
+	this.attribute = attribute;
 };
 phase_Use.__name__ = true;
 phase_Use.prototype = {
@@ -3339,10 +3405,10 @@ phase_Use.prototype = {
 	}
 	,__class__: phase_Use
 };
-var phase_Namespace = function(path,decls,annotation) {
+var phase_Namespace = function(path,decls,attribute) {
 	this.path = path;
 	this.decls = decls;
-	this.annotation = annotation;
+	this.attribute = attribute;
 };
 phase_Namespace.__name__ = true;
 phase_Namespace.prototype = {
@@ -3451,12 +3517,12 @@ phase_Block.prototype = {
 	}
 	,__class__: phase_Block
 };
-var phase_Function = function(name,params,body,ret,annotation) {
+var phase_Function = function(name,params,body,ret,attribute) {
 	this.name = name;
 	this.params = params;
 	this.body = body;
 	this.ret = ret;
-	this.annotation = annotation;
+	this.attribute = attribute;
 };
 phase_Function.__name__ = true;
 phase_Function.prototype = {
@@ -3479,9 +3545,10 @@ phase_Return.prototype = {
 var phase_FieldKind = $hxEnums["phase.FieldKind"] = { __ename__:true,__constructs__:null
 	,FUse: ($_=function(type) { return {_hx_index:0,type:type,__enum__:"phase.FieldKind",toString:$estr}; },$_._hx_name="FUse",$_.__params__ = ["type"],$_)
 	,FVar: ($_=function(v,type) { return {_hx_index:1,v:v,type:type,__enum__:"phase.FieldKind",toString:$estr}; },$_._hx_name="FVar",$_.__params__ = ["v","type"],$_)
-	,FFun: ($_=function(fun) { return {_hx_index:2,fun:fun,__enum__:"phase.FieldKind",toString:$estr}; },$_._hx_name="FFun",$_.__params__ = ["fun"],$_)
+	,FProp: ($_=function(getter,setter,type) { return {_hx_index:2,getter:getter,setter:setter,type:type,__enum__:"phase.FieldKind",toString:$estr}; },$_._hx_name="FProp",$_.__params__ = ["getter","setter","type"],$_)
+	,FFun: ($_=function(fun) { return {_hx_index:3,fun:fun,__enum__:"phase.FieldKind",toString:$estr}; },$_._hx_name="FFun",$_.__params__ = ["fun"],$_)
 };
-phase_FieldKind.__constructs__ = [phase_FieldKind.FUse,phase_FieldKind.FVar,phase_FieldKind.FFun];
+phase_FieldKind.__constructs__ = [phase_FieldKind.FUse,phase_FieldKind.FVar,phase_FieldKind.FProp,phase_FieldKind.FFun];
 var phase_FieldAccess = $hxEnums["phase.FieldAccess"] = { __ename__:true,__constructs__:null
 	,AStatic: {_hx_name:"AStatic",_hx_index:0,__enum__:"phase.FieldAccess",toString:$estr}
 	,APublic: {_hx_name:"APublic",_hx_index:1,__enum__:"phase.FieldAccess",toString:$estr}
@@ -3490,11 +3557,11 @@ var phase_FieldAccess = $hxEnums["phase.FieldAccess"] = { __ename__:true,__const
 	,AConst: {_hx_name:"AConst",_hx_index:4,__enum__:"phase.FieldAccess",toString:$estr}
 };
 phase_FieldAccess.__constructs__ = [phase_FieldAccess.AStatic,phase_FieldAccess.APublic,phase_FieldAccess.APrivate,phase_FieldAccess.AAbstract,phase_FieldAccess.AConst];
-var phase_Field = function(name,kind,access,annotation) {
+var phase_Field = function(name,kind,access,attribute) {
 	this.name = name;
 	this.kind = kind;
 	this.access = access;
-	this.annotation = annotation;
+	this.attribute = attribute;
 };
 phase_Field.__name__ = true;
 phase_Field.prototype = {
@@ -3509,13 +3576,13 @@ var phase_ClassKind = $hxEnums["phase.ClassKind"] = { __ename__:true,__construct
 	,KindTrait: {_hx_name:"KindTrait",_hx_index:2,__enum__:"phase.ClassKind",toString:$estr}
 };
 phase_ClassKind.__constructs__ = [phase_ClassKind.KindClass,phase_ClassKind.KindInterface,phase_ClassKind.KindTrait];
-var phase_Class = function(name,kind,superclass,interfaces,fields,annotation) {
+var phase_Class = function(name,kind,superclass,interfaces,fields,attribute) {
 	this.name = name;
 	this.kind = kind;
 	this.superclass = superclass;
 	this.interfaces = interfaces;
 	this.fields = fields;
-	this.annotation = annotation;
+	this.attribute = attribute;
 };
 phase_Class.__name__ = true;
 phase_Class.prototype = {

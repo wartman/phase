@@ -1,18 +1,18 @@
 namespace Phase {
 
   class Boot {
-    static annotations = []
+    static attributes = []
 
-    static registerAnnotation(name, field, annotations) {
-      static.annotations[name][field] = annotations
+    static registerAttribute(name, field, attributes) {
+      static.attributes[name][field] = attributes
     }
 
-    static getAnnotation(name, field = null) {
+    static getAttribute(name, field = null) {
       // todo: handle superclasses and stuff?
       if (!field) {
-        return static.annotations[name]['__CLASS__']
+        return static.attributes[name]['__CLASS__']
       }
-      return static.annotations[name][field]
+      return static.attributes[name][field]
     }
   }
 

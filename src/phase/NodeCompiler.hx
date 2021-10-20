@@ -23,7 +23,7 @@ class NodeCompiler {
   @:expose('compile')
   public static function compile(src:String, ?options:PhpGeneratorOptions, ?relative:String):Promise<Array<PhaseModule>> {
     if (relative == null) relative = src.normalize();
-    if (options == null) options = { annotation: AnnotateOnClass };
+    if (options == null) options = { attribute: AnnotateOnClass };
     return Promise.all([ for (name in FileSystem.readDirectory(src)) {
       var path = Path.join([ src, name ]);
       if (path.isDirectory()) {

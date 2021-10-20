@@ -39,29 +39,29 @@ class Parser {
     return stmts;
   }
 
-  function declaration(?annotation:Array<Expr>):Stmt {
-    if (annotation == null) annotation = [];
+  function declaration(?attribute:Array<Expr>):Stmt {
+    if (attribute == null) attribute = [];
     try {
-      if (match([ TokLeftBracket ])) return declaration(annotationList());
+      if (match([ TokLeftBracket ])) return declaration(attributeList());
       if (match([ TokVar ])) {
-        if (annotation.length > 0) {
-          error(previous(), 'Annotations are not allowed here');
+        if (attribute.length > 0) {
+          error(previous(), 'Attributes are not allowed here');
         }
         return varDeclaration();
       }
       if (match([ TokGlobal ])) {
-        if (annotation.length > 0) {
-          error(previous(), 'Annotations are not allowed here');
+        if (attribute.length > 0) {
+          error(previous(), 'Attributes are not allowed here');
         }
         return globalDeclaration();
       }
-      if (match([ TokFunction ])) return functionDeclaration(false, annotation);
-      if (match([ TokEnum ])) return enumDeclaration(annotation);
-      if (match([ TokInterface ])) return interfaceDeclaration(annotation);
-      if (match([ TokTrait ])) return traitDeclaration(annotation);
-      if (match([ TokClass ])) return classDeclaration(annotation);
-      if (match([ TokUse ])) return useDeclaration(annotation);
-      if (match([ TokNamespace ])) return packageDeclaration(annotation);
+      if (match([ TokFunction ])) return functionDeclaration(false, attribute);
+      if (match([ TokEnum ])) return enumDeclaration(attribute);
+      if (match([ TokInterface ])) return interfaceDeclaration(attribute);
+      if (match([ TokTrait ])) return traitDeclaration(attribute);
+      if (match([ TokClass ])) return classDeclaration(attribute);
+      if (match([ TokUse ])) return useDeclaration(attribute);
+      if (match([ TokNamespace ])) return packageDeclaration(attribute);
       return statement();
     } catch (error:ParserError) {
       synchronize();
@@ -81,7 +81,7 @@ class Parser {
     return expressionStatement();
   }
 
-  function packageDeclaration(annotation:Array<Expr>) {
+  function packageDeclaration(attribute:Array<Expr>) {
     if (inNamespace) error(previous(), 'Namespaces cannot be nested');
     inNamespace = true;
 
@@ -102,10 +102,10 @@ class Parser {
     ignoreNewlines();
 
     inNamespace = false;
-    return new Stmt.Namespace(path, decls, annotation);
+    return new Stmt.Namespace(path, decls, attribute);
   }
 
-  function useDeclaration(annotation:Array<Expr>) {
+  function useDeclaration(attribute:Array<Expr>) {
     if (!inNamespace) error(previous(), '`use` is not allowed outside a namespace');
     
     var kind:Stmt.UseKind = UseNormal;
@@ -170,7 +170,7 @@ class Parser {
     }
 
     expectEndOfStatement();
-    return new Stmt.Use(path, absolute, kind, annotation);
+    return new Stmt.Use(path, absolute, kind, attribute);
   }
 
   function varDeclaration() {
@@ -189,8 +189,8 @@ class Parser {
     return new Stmt.Global(name);
   }
 
-  function functionDef(?isAnnon:Bool, ?annotations:Array<Expr>):Stmt {
-    if (annotations == null) annotations = [];
+  function functionDef(?isAnnon:Bool, ?attributes:Array<Expr>):Stmt {
+    if (attributes == null) attributes = [];
     var name:Token;
     if (!isAnnon || check(TokIdentifier)) {
       name = consume(TokIdentifier, 'Expect function name.');
@@ -204,7 +204,7 @@ class Parser {
     consume(TokLeftBrace, 'Expect \'{\' before function body');
     var body = functionBody();
 
-    return new Stmt.Function(name, params, body, ret, annotations);
+    return new Stmt.Function(name, params, body, ret, attributes);
   }
 
   function functionParams(?allowInit:Bool = false):Array<Stmt.FunctionArg> {
@@ -258,13 +258,13 @@ class Parser {
     return new Stmt.Block(body);
   }
 
-  function functionDeclaration(isInline:Bool = false, ?annotations:Array<Expr>):Stmt {
-    var def = functionDef(isInline, annotations);
+  function functionDeclaration(isInline:Bool = false, ?attributes:Array<Expr>):Stmt {
+    var def = functionDef(isInline, attributes);
     ignoreNewlines();
     return def;
   }
 
-  function interfaceDeclaration(annotation:Array<Expr>) {
+  function interfaceDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a class name. Must start uppercase.');
     var interfaces:Array<Token> = [];
     var fields:Array<Stmt.Field> = [];
@@ -287,10 +287,10 @@ class Parser {
     consume(TokRightBrace, "Expect '}' at end of interface body");
     ignoreNewlines();
 
-    return new Stmt.Class(name, KindInterface, null, interfaces, fields, annotation);
+    return new Stmt.Class(name, KindInterface, null, interfaces, fields, attribute);
   }
 
-  function traitDeclaration(annotation:Array<Expr>) {
+  function traitDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a trait name. Must start uppercase.');
     var fields:Array<Stmt.Field> = [];
 
@@ -306,10 +306,10 @@ class Parser {
     consume(TokRightBrace, "Expect '}' at end of trait body");
     ignoreNewlines();
 
-    return new Stmt.Class(name, KindTrait, null, [], fields, annotation);
+    return new Stmt.Class(name, KindTrait, null, [], fields, attribute);
   }
 
-  function enumDeclaration(annotation:Array<Expr>) {
+  function enumDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect an enum name. Must start uppercase.');
     var fields:Array<Stmt.Field> = [];
 
@@ -339,10 +339,10 @@ class Parser {
     consume(TokRightBrace, "Expect '}' at end of trait body");
     ignoreNewlines();
   
-    return new Stmt.Class(name, KindClass, null, [], fields, annotation);
+    return new Stmt.Class(name, KindClass, null, [], fields, attribute);
   }
 
-  function classDeclaration(annotation:Array<Expr>) {
+  function classDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a class name. Must start uppercase.');
     var superclass:Token = null;
     var interfaces:Array<Token> = [];
@@ -393,7 +393,7 @@ class Parser {
     consume(TokRightBrace, "Expect '}' at end of class body");
     ignoreNewlines();
 
-    return new Stmt.Class(name, KindClass, superclass, interfaces, fields, annotation);
+    return new Stmt.Class(name, KindClass, superclass, interfaces, fields, attribute);
   }
 
   function fieldDeclaration(?options:{ access:Array<Stmt.FieldAccess> }) {
@@ -427,14 +427,14 @@ class Parser {
     }
 
     var access:Array<Stmt.FieldAccess> = options.access;
-    var annotation:Array<Expr> = [];
+    var attribute:Array<Expr> = [];
     function addAccess(a:Stmt.FieldAccess) {
       if (access.has(a)) error(previous(), 'Only one `$a` declaration is allowed per field'); 
       access.push(a);
     }
 
     if (match([ TokLeftBracket ])) {
-      annotation = annotationList();
+      attribute = attributeList();
     }
 
     while (match([
@@ -468,7 +468,50 @@ class Parser {
         name,
         FVar(new Stmt.Var(name, null), type),
         access,
-        annotation
+        attribute
+      );
+    }
+
+    if (match([ TokLeftBrace ])) {
+      var getter:Stmt.Function = null;
+      var setter:Stmt.Function = null;
+      while (!check(TokRightBrace) && !isAtEnd()) {
+        ignoreNewlines();
+        var mode = consume(TokIdentifier, 'Expected an identifier');
+        switch mode.lexeme {
+          case 'get':
+            if (getter != null) {
+              throw error(mode, '`get` already defined');
+            }
+            consume(TokLeftBrace, 'expected a `{`');
+            var body = functionBody();
+            expectEndOfStatement();
+            getter = new Stmt.Function(mode, [], body, type, []);
+          case 'set':
+            if (setter != null) {
+              throw error(mode, '`set` already defined');
+            }
+            consume(TokLeftBrace, 'expected a `{`');
+            var body = functionBody();
+            expectEndOfStatement();
+            setter = new Stmt.Function(mode, [
+              { 
+                name: new Token(TokIdentifier, 'value', 'value', previous().pos),
+                type: type,
+                expr: null,
+              }
+            ], body, type, []);
+          default:
+            throw error(mode, 'Expected `get` or `set`');
+        }
+      }
+      ignoreNewlines();
+      consume(TokRightBrace, 'Expected a `}`');
+      return new Stmt.Field(
+        name,
+        FProp(getter, setter, type),
+        access,
+        attribute
       );
     }
 
@@ -484,7 +527,7 @@ class Parser {
         name,
         FVar(new Stmt.Var(name, expr), type),
         access,
-        annotation
+        attribute
       ); 
     }
 
@@ -504,12 +547,12 @@ class Parser {
       name,
       FFun(new Stmt.Function(name, params, body, ret, [])),
       access,
-      annotation
+      attribute
     );
   }
 
-  function annotationList():Array<Expr> {
-    var annotation:Array<Expr> = [];
+  function attributeList():Array<Expr> {
+    var attribute:Array<Expr> = [];
     do {
       var absolute = false;
       if (match([ TokScopeResolutionOperator ])) absolute = true;
@@ -523,17 +566,17 @@ class Parser {
           params = parseArguments();
         }
         ignoreNewlines();
-        consume(TokRightParen, "Expect ')' at the end of an annotation");
+        consume(TokRightParen, "Expect ')' at the end of an attribute");
       }
       ignoreNewlines();
-      annotation.push(new Expr.Annotation(path, params, absolute, null));
+      attribute.push(new Expr.Attribute(path, params, absolute, null));
     } while (match([ TokComma ]));
-    consume(TokRightBracket, "Expect a ']' at the end of an annotation");
+    consume(TokRightBracket, "Expect a ']' at the end of an attribute");
     ignoreNewlines();
     if (match([ TokLeftBracket ])) {
-      annotation = annotation.concat(annotationList());
+      attribute = attribute.concat(attributeList());
     }
-    return annotation;
+    return attribute;
   }
 
   function throwStatement():Stmt {
@@ -574,14 +617,14 @@ class Parser {
     consume(TokRightParen, "Expect ')' after if condition.");
 
     var thenBranch = statement();
-    if (!Std.is(thenBranch, Stmt.Block)) {
+    if (!Std.isOfType(thenBranch, Stmt.Block)) {
       thenBranch = new Stmt.Block([ thenBranch ]);
     }
     
     var elseBranch:Stmt = null;
     if (match([ TokElse ])) {
       elseBranch = statement();
-      if (!Std.is(elseBranch, Stmt.Block)) {
+      if (!Std.isOfType(elseBranch, Stmt.Block)) {
         elseBranch = new Stmt.Block([ elseBranch ]);
       }
     }
@@ -712,13 +755,13 @@ class Parser {
       ignoreNewlines();
       var value = assignment();
 
-      if (Std.is(expr, Expr.Variable)) {
+      if (Std.isOfType(expr, Expr.Variable)) {
         var name = (cast expr).name;
         return new Expr.Assign(name, value);
-      } else if (Std.is(expr, Expr.Get)) {
+      } else if (Std.isOfType(expr, Expr.Get)) {
         var get:Expr.Get = cast expr;
         return new Expr.Set(get.object, get.name, value);
-      } else if (Std.is(expr, Expr.SubscriptGet)) {
+      } else if (Std.isOfType(expr, Expr.SubscriptGet)) {
         var get:Expr.SubscriptGet = cast expr;
         return new Expr.SubscriptSet(previous(), get.object, get.index, value);
       }
@@ -879,7 +922,7 @@ class Parser {
         var name:Expr = if (match([ TokLeftBrace ])) {
           ignoreNewlines();
           var ret = expression();
-          if (Std.is(ret, Expr.Variable)) {
+          if (Std.isOfType(ret, Expr.Variable)) {
             // Required to make this point to a var. 
             ret = new Expr.Grouping(ret);
           }
@@ -887,7 +930,6 @@ class Parser {
           consume(TokRightBrace, "Expect a '}'");
           ret;
         } else if (match([ TokTypeIdentifier, TokClass ])) {
-          trace('cls');
           new Expr.Variable(previous());
         } else {
           new Expr.Variable(consume(TokIdentifier, "Expect property name after '.'."));

@@ -9,6 +9,11 @@ namespace Test::Language::Classes {
     foo
     private bar = 'bar'
 
+    barish: String {
+      get { this.bar }
+      set { this.bar = value }
+    }
+
     new(foo) {
       this.foo = foo
     }
@@ -29,6 +34,9 @@ namespace Test::Language::Classes {
   ::Expect.that(cls.getBar(), 'bar')
   ::Expect.that(cls.{'foo'}, 'foo')
   ::Expect.that(cls.{foo}, 'foo')
+  ::Expect.that(cls.barish, 'bar')
+  cls.barish = 'bin'
+  ::Expect.that(cls.barish, 'bin')
 
   // Check for named arguments:
   ::Expect.that((Simple(foo: 'foo')).foo, 'foo');

@@ -1,12 +1,13 @@
 -cp src
--lib hxnodejs
 
 --each
 
 -main Phase
--js bin/phase.js
+-php dist/phase
 
 --next
+
+-lib hxnodejs
 
 # For use as imports
 -D noCmd
