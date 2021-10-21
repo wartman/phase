@@ -1,5 +1,6 @@
 package phase;
 
+import phase.analysis.StaticAnalyzer;
 using Type;
 using StringTools;
 using Lambda;
@@ -38,7 +39,8 @@ class PhpGenerator
   static final typeAliases = [
     'String' => 'string',
     'Int' => 'int',
-    'Array' => 'array',
+    // 'Array' => 'array',
+    'Array' => '\\Std\\PhaseArray',
     'Callable' => 'callable',
     'Any' => 'mixed',
     'Scalar' => 'scalar'
@@ -54,7 +56,8 @@ class PhpGenerator
   var indentLevel:Int = 0;
   var uid:Int = 0;
   var append:Array<String> = [];
-  var exprKind:Map<Expr, PhpKind> = [];
+  var typedExprs:Map<Expr, phase.analysis.Type> = [];
+  var isCall:Bool = false;
 
   public function new(
     stmts:Array<Stmt>,
@@ -78,8 +81,10 @@ class PhpGenerator
 
   public function generate():String {
     append = [];
-    exprKind = [];
     scope = new PhpScope();
+
+    var analysis = new StaticAnalyzer(stmts, reporter);
+    typedExprs = analysis.analyze();
 
     var out:Array<String> = [];
     for (stmt in stmts) {
@@ -196,6 +201,8 @@ class PhpGenerator
       out += generateAttributes({ cls: stmt }, stmt.attribute);
     }
 
+    // @todo: we need to check our attributes for compiler-level stuff.
+
     var keyword = switch stmt.kind {
       case KindClass: 'class';
       case KindInterface: 'interface';
@@ -245,7 +252,7 @@ class PhpGenerator
     }
 
     if (props.length > 0) {
-      // Todo: this is iffy -- make better
+      // @todo: this is iffy -- make better
       out += '\n' + getIndent() + "public function __get($prop)";
       out += '\n' + getIndent() + "{";
       indent();
@@ -493,10 +500,17 @@ class PhpGenerator
   }
 
   public function visitArrayLiteralExpr(expr:Expr.ArrayLiteral):String {
-    return '[' + generateList(expr.values) + ']';
+    if (expr.isNative) {
+      return '[' + generateList(expr.values) + ']';
+    }
+
+    var cls = generateTypePath(new Expr.Type([ 
+      new Token(TokTypeIdentifier, 'Array', 'Array', null)
+    ], true));
+    return 'new $cls([' + generateList(expr.values) + '])';
   }
 
-  public function visitAssocArrayLiteralExpr(expr:Expr.AssocArrayLiteral):String {
+  public function visitMapLiteralExpr(expr:Expr.MapLiteral):String {
     indent();
     var out = '[\n' + [ for (i in 0...expr.keys.length) {
       var key = expr.keys[i];
@@ -535,20 +549,15 @@ class PhpGenerator
   }
 
   public function visitCallExpr(expr:Expr.Call):String {
+    isCall = true;
+    // todo: rework to use the static analyzer once it's working better
     var callee = switch expr.callee.getClass() {
-      case Expr.Get:
-        var getter:Expr.Get = cast expr.callee;
-        switch getter.object.getClass() {
-          case Expr.Type | Expr.Static:
-            // Don't add the `$` to the function name.
-            generateExpr(getter.object) + '::' + getProperty(getter.name);
-          default: generateExpr(getter.object) + '->' + getProperty(getter.name);
-        }
       case Expr.Type:
         // Initializer
         'new ' + generateExpr(expr.callee);
       default: generateExpr(expr.callee);
     }
+    isCall = false;
     return '$callee(' + expr.args.map(arg -> switch arg {
       case Positional(expr): generateExpr(expr);
       case Named(name, expr): '${name}: ${generateExpr(expr)}';
@@ -556,9 +565,20 @@ class PhpGenerator
   }
 
   public function visitGetExpr(expr:Expr.Get):String {
+    var objectType = typedExprs.get(expr.object);
+    switch objectType {
+      case TInstance(StaticAnalyzer.stringType):
+        // @todo: this is just a proof of concept -- we need a 
+        //        better solution.
+        var name = getProperty(expr.name, false);
+        var str = generateExpr(expr.object);
+        return '(new \\Std\\PhaseString(' + str + '))->' + name;
+      default:
+    }
+
     return switch expr.object.getClass() {
       case Expr.Type | Expr.Static:
-        generateExpr(expr.object) + '::' + getProperty(expr.name, true);
+        generateExpr(expr.object) + '::' + getProperty(expr.name, !isCall);
       default: 
         generateExpr(expr.object) + '->' + getProperty(expr.name);
     }
@@ -661,9 +681,9 @@ class PhpGenerator
     return if (Std.isOfType(expr.value, Int)) 
       expr.value;
     else if (Std.isOfType(expr.value, Bool))
-      expr.value;
+      if (expr.value == true) 'true' else 'false';
     else if (expr.value == null)
-      return 'null';
+      'null';
     else {
       var value:String = expr.value;
       '"' + value.replace('"', '\\"') + '"'; // todo: escape strings
@@ -747,7 +767,7 @@ class PhpGenerator
         var tok = new Token(TokIdentifier, '__attributes__', '', pos);
         target.cls.fields.push(new Stmt.Field(
           tok,
-          FVar(new Stmt.Var(tok, new Expr.ArrayLiteral(tok, [])), null),
+          FVar(new Stmt.Var(tok, null, new Expr.ArrayLiteral(tok, [], false)), null),
           [ APublic, AStatic ],
           []
         ));
@@ -772,7 +792,8 @@ class PhpGenerator
         var reg = '\\Phase\\Boot::registerAttribute($clsName::class, "$kind", '
           + visitArrayLiteralExpr(new Expr.ArrayLiteral(
             target.cls.name,
-            attributes
+            attributes,
+            false
           )) + ');';
         append.push(reg);
         '';
@@ -781,7 +802,8 @@ class PhpGenerator
         var reg = '$clsName::$$__attributes__["$kind"] = '
           + visitArrayLiteralExpr(new Expr.ArrayLiteral(
             target.cls.name,
-            attributes
+            attributes,
+            false
           )) + ';';
         append.push(reg);
         '';

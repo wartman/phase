@@ -175,12 +175,16 @@ class Parser {
 
   function varDeclaration() {
     var name:Token = consume(TokIdentifier, 'Expect variable name.');
+    var type:Expr.Type = null;
     var init:Expr = null;
+    if (match([ TokColon ])) {
+      type = parseTypePath();
+    }
     if (match([ TokEqual ])) {
       init = expression();
     }
     expectEndOfStatement();
-    return new Stmt.Var(name, init);
+    return new Stmt.Var(name, type, init);
   }
 
   function globalDeclaration() {
@@ -309,9 +313,16 @@ class Parser {
     return new Stmt.Class(name, KindTrait, null, [], fields, attribute);
   }
 
+  // @todo: this is a temporary solution. I want ADT style types like Haxe
+  //        has if at all possible. 
   function enumDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect an enum name. Must start uppercase.');
+    var superClass:Token = null;
     var fields:Array<Stmt.Field> = [];
+
+    consume(TokAs, 'Expected an `as`');
+    
+    superClass = consume(TokTypeIdentifier, 'Expect a wrapped type name');
 
     consume(TokLeftBrace, "Expect '{' before trait body.");
     ignoreNewlines();
@@ -320,16 +331,18 @@ class Parser {
     while (!check(TokRightBrace) && !isAtEnd()) {
       ignoreNewlines();
       var fieldName = consume(TokTypeIdentifier, "Expect an uppercase identifier");
-      var value = if (match([ TokEqual ])) {
+      var value:Expr = if (match([ TokEqual ])) {
         expression();
-      } else {
-        new Expr.Literal(index);
+      } else switch superClass.lexeme {
+        case 'String': new Expr.Literal(fieldName.lexeme);
+        case 'Int': new Expr.Literal(index);
+        case _: throw error(superClass, 'Unknown type -- currently enums may only be Strings or Ints');
       }
       index++;
       expectEndOfStatement();
       fields.push(new Stmt.Field(
         fieldName,
-        FVar(new Stmt.Var(fieldName, value), null),
+        FVar(new Stmt.Var(fieldName, null, value), null),
         [ AConst ],
         []
       ));
@@ -379,7 +392,7 @@ class Parser {
           if (a.isInit == true && !fields.exists(f -> f.name.lexeme == a.name.lexeme)) {
             fields.push(new Stmt.Field(
               a.name,
-              FVar(new Stmt.Var(a.name, null), a.type),
+              FVar(new Stmt.Var(a.name, a.type, null), a.type),
               [ APublic ],
               []
             ));
@@ -418,7 +431,7 @@ class Parser {
       var value = expression();
       var out = new Stmt.Field(
         name,
-        FVar(new Stmt.Var(name, value), null),
+        FVar(new Stmt.Var(name, null, value), null),
         [ AConst ],
         []
       );
@@ -466,7 +479,7 @@ class Parser {
       ignoreNewlines();
       return new Stmt.Field(
         name,
-        FVar(new Stmt.Var(name, null), type),
+        FVar(new Stmt.Var(name, type, null), type),
         access,
         attribute
       );
@@ -525,7 +538,7 @@ class Parser {
       expectEndOfStatement();
       return new Stmt.Field(
         name,
-        FVar(new Stmt.Var(name, expr), type),
+        FVar(new Stmt.Var(name, type, expr), type),
         access,
         attribute
       ); 
@@ -1008,8 +1021,8 @@ class Parser {
     parts.push(primary());
 
     return new Expr.Call(callee, firstTok, [
-      Positional(new Expr.ArrayLiteral(firstTok, parts)),
-      Positional(new Expr.ArrayLiteral(firstTok, placeholders))
+      Positional(new Expr.ArrayLiteral(firstTok, parts, false)),
+      Positional(new Expr.ArrayLiteral(firstTok, placeholders, false))
     ]);
   }
 
@@ -1087,6 +1100,12 @@ class Parser {
       return new Expr.Grouping(expr);
     }
 
+    if (match([ TokDollar ])) {
+      if (match([ TokLeftBracket ])) {
+        return arrayOrAssocLiteral(true);
+      }
+    }
+
     if (match([ TokLeftBracket ])) {
       return arrayOrAssocLiteral();
     }
@@ -1140,25 +1159,25 @@ class Parser {
     return new Expr.Ternary(condition, thenBranch, elseBranch);
   }
 
-  function arrayOrAssocLiteral():Expr {
+  function arrayOrAssocLiteral(isNative:Bool = false):Expr {
     ignoreNewlines();
     if (checkNext(TokColon)) {
-      return assocArrayLiteral();
+      return mapLiteral(isNative);
     }
-    return arrayLiteral();
+    return arrayLiteral(isNative);
   }
 
-  function arrayLiteral():Expr {
+  function arrayLiteral(isNative:Bool = false):Expr {
     var values:Array<Expr> = [];
     if (!check(TokRightBracket)) {
       values = parseList(TokComma, expression);
     }
     ignoreNewlines(); // May be one after the last item in the list
     var end = consume(TokRightBracket, "Expect ']' after values.");
-    return new Expr.ArrayLiteral(end, values);
+    return new Expr.ArrayLiteral(end, values, isNative);
   }
 
-  function assocArrayLiteral():Expr {
+  function mapLiteral(isNative:Bool = false):Expr {
     var keys:Array<Expr> = [];
     var values:Array<Expr> = [];
 
@@ -1175,7 +1194,7 @@ class Parser {
 
     var end = consume(TokRightBracket, "Expect ']' at the end of an assoc array literal");
 
-    return new Expr.AssocArrayLiteral(end, keys, values);
+    return new Expr.MapLiteral(end, keys, values, isNative);
   }
 
   function shortLambda(isInline:Bool = false) {
@@ -1255,6 +1274,11 @@ class Parser {
   }
 
   function parseTypePath():Expr.Type {
+    if (match([ TokDollar ])) {
+      var native = consume(TokIdentifier, 'Expect a native PHP scalar identifier');
+      return new Expr.Type([ native ], false);
+    }
+
     var absolute = match([ TokScopeResolutionOperator ]);
     var path = parseList(
       TokScopeResolutionOperator, 

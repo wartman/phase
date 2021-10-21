@@ -4,6 +4,7 @@ enum abstract TokenType(String) to String {
 
   var TokAt = '@';
   var TokSharp = '#';
+  var TokDollar = '$';
   var TokLeftParen = '(';
   var TokRightParen = ')';
   var TokLeftBrace = '{';

@@ -99,6 +99,7 @@ class Scanner {
       case '*': addToken(TokStar);
       case '@': addToken(TokAt);
       case '#': addToken(TokSharp);
+      case '$': addToken(TokDollar);
       case '!': addToken(match('=') ? TokBangEqual : TokBang);
       case '=': addToken(match('=') ? TokBoolEqual : TokEqual);
       case '<': addToken(match('=') ? TokLessEqual : TokLess);

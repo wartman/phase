@@ -2,8 +2,10 @@ namespace Test::Language::Arrays {
 
   var foo = []
   foo[] = 1
-  foo[] = 2
+  foo.push(2)
+
+  var native = $[ 1, 2 ]
 
   ::Expect.that(count(foo), 2)
-
+  ::Expect.that(foo.length, 2)
 }

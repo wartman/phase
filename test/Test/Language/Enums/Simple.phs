@@ -1,7 +1,7 @@
 namespace Test::Language::Enums {
 
   // Showing off the compact syntax:
-  enum Simple { Foo; Bar }
+  enum Simple as Int { Foo; Bar }
 
   ::Expect.that(Simple.Foo, 0)
   ::Expect.that(Simple.Bar, 1)

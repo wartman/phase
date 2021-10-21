@@ -1,6 +1,6 @@
 namespace Test::Language::Templates {
 
-  var tpl = { |parts, placeholders|
+  function tpl(parts, placeholders) {
     var out = ''
     for (i in 0..count(parts)) {
       var value = if (i > 0) placeholders[i - 1] else null

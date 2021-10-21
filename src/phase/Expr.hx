@@ -110,12 +110,14 @@ class Literal implements Expr {
 class ArrayLiteral implements Expr {
   var end:Token;
   var values:Array<Expr>;
+  var isNative:Bool = false;
 }
 
-class AssocArrayLiteral implements Expr {
+class MapLiteral implements Expr {
   var end:Token;
   var keys:Array<Expr>;
   var values:Array<Expr>;
+  var isNative:Bool = false;
 }
 
 class Lambda implements Expr {

@@ -1,0 +1,16 @@
+namespace Test::Language::Classes {
+
+  [Std::Compiler::Rename('foobar')]
+  interface ExternFoo {
+    getFoo(): String
+  }
+
+  class Bar implements ExternFoo {
+    new() {}
+
+    getFoo(): String { 'foo' }
+  }
+
+  ::Expect((Bar()).getFoo(), 'foo')
+
+}

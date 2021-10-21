@@ -35,6 +35,7 @@ class Namespace implements Stmt {
 
 class Var implements Stmt {
   var name:Token;
+  var type:Null<Expr.Type>;
   var initializer:Expr;
 }
 
@@ -137,6 +138,7 @@ enum ClassKind {
   KindClass;
   KindInterface;
   KindTrait;
+  // KindEnum;
 }
 
 class Class implements Stmt {

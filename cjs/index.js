@@ -61,6 +61,16 @@ Lambda.fold = function(it,f,first) {
 	}
 	return first;
 };
+Lambda.find = function(it,f) {
+	var v = $getIterator(it);
+	while(v.hasNext()) {
+		var v1 = v.next();
+		if(f(v1)) {
+			return v1;
+		}
+	}
+	return null;
+};
 Math.__name__ = true;
 var Std = function() { };
 Std.__name__ = true;
@@ -192,7 +202,15 @@ var haxe_ds_ObjectMap = function() {
 };
 haxe_ds_ObjectMap.__name__ = true;
 haxe_ds_ObjectMap.prototype = {
-	__class__: haxe_ds_ObjectMap
+	set: function(key,value) {
+		var id = key.__id__;
+		if(id == null) {
+			id = (key.__id__ = $global.$haxeUID++);
+		}
+		this.h[id] = value;
+		this.h.__keys__[id] = key;
+	}
+	,__class__: haxe_ds_ObjectMap
 };
 var haxe_ds_StringMap = function() {
 	this.h = Object.create(null);
@@ -780,9 +798,11 @@ phase_Literal.prototype = {
 	}
 	,__class__: phase_Literal
 };
-var phase_ArrayLiteral = function(end,values) {
+var phase_ArrayLiteral = function(end,values,isNative) {
+	this.isNative = false;
 	this.end = end;
 	this.values = values;
+	this.isNative = isNative;
 };
 phase_ArrayLiteral.__name__ = true;
 phase_ArrayLiteral.prototype = {
@@ -791,17 +811,19 @@ phase_ArrayLiteral.prototype = {
 	}
 	,__class__: phase_ArrayLiteral
 };
-var phase_AssocArrayLiteral = function(end,keys,values) {
+var phase_MapLiteral = function(end,keys,values,isNative) {
+	this.isNative = false;
 	this.end = end;
 	this.keys = keys;
 	this.values = values;
+	this.isNative = isNative;
 };
-phase_AssocArrayLiteral.__name__ = true;
-phase_AssocArrayLiteral.prototype = {
+phase_MapLiteral.__name__ = true;
+phase_MapLiteral.prototype = {
 	accept: function(visitor) {
-		return visitor.visitAssocArrayLiteralExpr(this);
+		return visitor.visitMapLiteralExpr(this);
 	}
-	,__class__: phase_AssocArrayLiteral
+	,__class__: phase_MapLiteral
 };
 var phase_Lambda = function(func) {
 	this.func = func;
@@ -1100,12 +1122,16 @@ phase_Parser.prototype = {
 	}
 	,varDeclaration: function() {
 		var name = this.consume("[identifier]","Expect variable name.");
+		var type = null;
 		var init = null;
+		if(this.match([":"])) {
+			type = this.parseTypePath();
+		}
 		if(this.match(["="])) {
 			init = this.expression();
 		}
 		this.expectEndOfStatement();
-		return new phase_Var(name,init);
+		return new phase_Var(name,type,init);
 	}
 	,globalDeclaration: function() {
 		var name = this.consume("[identifier]","Expect variable name.");
@@ -1216,17 +1242,34 @@ phase_Parser.prototype = {
 	}
 	,enumDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect an enum name. Must start uppercase.");
+		var superClass = null;
 		var fields = [];
+		this.consume("as","Expected an `as`");
+		superClass = this.consume("[type-identifier]","Expect a wrapped type name");
 		this.consume("{","Expect '{' before trait body.");
 		this.ignoreNewlines();
 		var index = 0;
 		while(!this.check("}") && !this.isAtEnd()) {
 			this.ignoreNewlines();
 			var fieldName = this.consume("[type-identifier]","Expect an uppercase identifier");
-			var value = this.match(["="]) ? this.expression() : new phase_Literal(index);
+			var value;
+			if(this.match(["="])) {
+				value = this.expression();
+			} else {
+				switch(superClass.lexeme) {
+				case "Int":
+					value = new phase_Literal(index);
+					break;
+				case "String":
+					value = new phase_Literal(fieldName.lexeme);
+					break;
+				default:
+					throw haxe_Exception.thrown(this.error(superClass,"Unknown type -- currently enums may only be Strings or Ints"));
+				}
+			}
 			++index;
 			this.expectEndOfStatement();
-			fields.push(new phase_Field(fieldName,phase_FieldKind.FVar(new phase_Var(fieldName,value),null),[phase_FieldAccess.AConst],[]));
+			fields.push(new phase_Field(fieldName,phase_FieldKind.FVar(new phase_Var(fieldName,null,value),null),[phase_FieldAccess.AConst],[]));
 		}
 		this.ignoreNewlines();
 		this.consume("}","Expect '}' at end of trait body");
@@ -1273,7 +1316,7 @@ phase_Parser.prototype = {
 							return f.name.lexeme == a[0].name.lexeme;
 						};
 					})(a))) {
-						fields.push(new phase_Field(a[0].name,phase_FieldKind.FVar(new phase_Var(a[0].name,null),a[0].type),[phase_FieldAccess.APublic],[]));
+						fields.push(new phase_Field(a[0].name,phase_FieldKind.FVar(new phase_Var(a[0].name,a[0].type,null),a[0].type),[phase_FieldAccess.APublic],[]));
 					}
 				}
 			}
@@ -1298,7 +1341,7 @@ phase_Parser.prototype = {
 			this.ignoreNewlines();
 			this.consume("=","Expect assignment for consts");
 			var value = this.expression();
-			var out = new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,value),null),[phase_FieldAccess.AConst],[]);
+			var out = new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,null,value),null),[phase_FieldAccess.AConst],[]);
 			this.expectEndOfStatement();
 			return out;
 		}
@@ -1338,7 +1381,7 @@ phase_Parser.prototype = {
 		}
 		if(this.match(["[newline]"])) {
 			this.ignoreNewlines();
-			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,null),type),access,attribute);
+			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,type,null),type),access,attribute);
 		}
 		if(this.match(["{"])) {
 			var getter = null;
@@ -1380,7 +1423,7 @@ phase_Parser.prototype = {
 			this.ignoreNewlines();
 			var expr = this.expression();
 			this.expectEndOfStatement();
-			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,expr),type),access,attribute);
+			return new phase_Field(name,phase_FieldKind.FVar(new phase_Var(name,type,expr),type),access,attribute);
 		}
 		this.consume("(","Expect '(' after function name.");
 		var params = this.functionParams(name.lexeme == "new");
@@ -1761,7 +1804,7 @@ phase_Parser.prototype = {
 			}
 		}
 		parts.push(this.primary());
-		return new phase_Call(callee,firstTok,[phase_CallArgument.Positional(new phase_ArrayLiteral(firstTok,parts)),phase_CallArgument.Positional(new phase_ArrayLiteral(firstTok,placeholders))]);
+		return new phase_Call(callee,firstTok,[phase_CallArgument.Positional(new phase_ArrayLiteral(firstTok,parts,false)),phase_CallArgument.Positional(new phase_ArrayLiteral(firstTok,placeholders,false))]);
 	}
 	,interpolation: function(expr) {
 		while(!this.isAtEnd()) {
@@ -1826,6 +1869,11 @@ phase_Parser.prototype = {
 			this.consume(")","Expect ')' after expression.");
 			return new phase_Grouping(expr);
 		}
+		if(this.match(["$"])) {
+			if(this.match(["["])) {
+				return this.arrayOrAssocLiteral(true);
+			}
+		}
 		if(this.match(["["])) {
 			return this.arrayOrAssocLiteral();
 		}
@@ -1866,23 +1914,32 @@ phase_Parser.prototype = {
 		var elseBranch = this.expression();
 		return new phase_Ternary(condition,thenBranch,elseBranch);
 	}
-	,arrayOrAssocLiteral: function() {
+	,arrayOrAssocLiteral: function(isNative) {
+		if(isNative == null) {
+			isNative = false;
+		}
 		this.ignoreNewlines();
 		if(this.checkNext(":")) {
-			return this.assocArrayLiteral();
+			return this.mapLiteral(isNative);
 		}
-		return this.arrayLiteral();
+		return this.arrayLiteral(isNative);
 	}
-	,arrayLiteral: function() {
+	,arrayLiteral: function(isNative) {
+		if(isNative == null) {
+			isNative = false;
+		}
 		var values = [];
 		if(!this.check("]")) {
 			values = this.parseList(",",$bind(this,this.expression));
 		}
 		this.ignoreNewlines();
 		var end = this.consume("]","Expect ']' after values.");
-		return new phase_ArrayLiteral(end,values);
+		return new phase_ArrayLiteral(end,values,isNative);
 	}
-	,assocArrayLiteral: function() {
+	,mapLiteral: function(isNative) {
+		if(isNative == null) {
+			isNative = false;
+		}
 		var keys = [];
 		var values = [];
 		if(!this.check("]")) {
@@ -1899,7 +1956,7 @@ phase_Parser.prototype = {
 			this.ignoreNewlines();
 		}
 		var end = this.consume("]","Expect ']' at the end of an assoc array literal");
-		return new phase_AssocArrayLiteral(end,keys,values);
+		return new phase_MapLiteral(end,keys,values,isNative);
 	}
 	,shortLambda: function(isInline) {
 		if(isInline == null) {
@@ -1940,6 +1997,10 @@ phase_Parser.prototype = {
 	}
 	,parseTypePath: function() {
 		var _gthis = this;
+		if(this.match(["$"])) {
+			var native = this.consume("[identifier]","Expect a native PHP scalar identifier");
+			return new phase_Type([native],false);
+		}
 		var absolute = this.match(["::"]);
 		var path = this.parseList("::",function() {
 			return _gthis.consume("[type-identifier]","Expect a TypeIdentifier");
@@ -2084,7 +2145,8 @@ var phase_GeneratorMode = $hxEnums["phase.GeneratorMode"] = { __ename__:true,__c
 };
 phase_GeneratorMode.__constructs__ = [phase_GeneratorMode.GeneratingRoot,phase_GeneratorMode.GeneratingClass,phase_GeneratorMode.GeneratingInterface,phase_GeneratorMode.GeneratingTrait,phase_GeneratorMode.GeneratingClosure,phase_GeneratorMode.GeneratingFunction];
 var phase_PhpGenerator = function(stmts,reporter,options) {
-	this.exprKind = new haxe_ds_ObjectMap();
+	this.isCall = false;
+	this.typedExprs = new haxe_ds_ObjectMap();
 	this.append = [];
 	this.uid = 0;
 	this.indentLevel = 0;
@@ -2113,8 +2175,9 @@ phase_PhpGenerator.__name__ = true;
 phase_PhpGenerator.prototype = {
 	generate: function() {
 		this.append = [];
-		this.exprKind = new haxe_ds_ObjectMap();
 		this.scope = new phase_PhpScope();
+		var analysis = new phase_analysis_StaticAnalyzer(this.stmts,this.reporter);
+		this.typedExprs = analysis.analyze();
 		var out = [];
 		var _g = 0;
 		var _g1 = this.stmts;
@@ -2664,9 +2727,13 @@ phase_PhpGenerator.prototype = {
 		}
 	}
 	,visitArrayLiteralExpr: function(expr) {
-		return "[" + this.generateList(expr.values) + "]";
+		if(expr.isNative) {
+			return "[" + this.generateList(expr.values) + "]";
+		}
+		var cls = this.generateTypePath(new phase_Type([new phase_Token("[type-identifier]","Array","Array",null)],true));
+		return "new " + cls + "([" + this.generateList(expr.values) + "])";
 	}
-	,visitAssocArrayLiteralExpr: function(expr) {
+	,visitMapLiteralExpr: function(expr) {
 		this.indent();
 		var _g = [];
 		var _g1 = 0;
@@ -2698,24 +2765,9 @@ phase_PhpGenerator.prototype = {
 	}
 	,visitCallExpr: function(expr) {
 		var _gthis = this;
-		var callee;
-		switch(js_Boot.getClass(expr.callee)) {
-		case phase_Get:
-			var getter = expr.callee;
-			switch(js_Boot.getClass(getter.object)) {
-			case phase_Static:case phase_Type:
-				callee = this.generateExpr(getter.object) + "::" + this.getProperty(getter.name);
-				break;
-			default:
-				callee = this.generateExpr(getter.object) + "->" + this.getProperty(getter.name);
-			}
-			break;
-		case phase_Type:
-			callee = "new " + this.generateExpr(expr.callee);
-			break;
-		default:
-			callee = this.generateExpr(expr.callee);
-		}
+		this.isCall = true;
+		var callee = js_Boot.getClass(expr.callee) == phase_Type ? "new " + this.generateExpr(expr.callee) : this.generateExpr(expr.callee);
+		this.isCall = false;
 		var tmp = "" + callee + "(";
 		var _this = expr.args;
 		var result = new Array(_this.length);
@@ -2741,9 +2793,19 @@ phase_PhpGenerator.prototype = {
 		return tmp + result.join(", ") + ")";
 	}
 	,visitGetExpr: function(expr) {
+		var objectType = this.typedExprs.h[expr.object.__id__];
+		if(objectType != null) {
+			if(objectType._hx_index == 6) {
+				if(objectType.cls == phase_analysis_StaticAnalyzer.stringType) {
+					var name = this.getProperty(expr.name,false);
+					var str = this.generateExpr(expr.object);
+					return "(new \\Std\\PhaseString(" + str + "))->" + name;
+				}
+			}
+		}
 		switch(js_Boot.getClass(expr.object)) {
 		case phase_Static:case phase_Type:
-			return this.generateExpr(expr.object) + "::" + this.getProperty(expr.name,true);
+			return this.generateExpr(expr.object) + "::" + this.getProperty(expr.name,!this.isCall);
 		default:
 			return this.generateExpr(expr.object) + "->" + this.getProperty(expr.name);
 		}
@@ -2858,7 +2920,11 @@ phase_PhpGenerator.prototype = {
 		if(typeof(v) == "number" && ((v | 0) === v)) {
 			return expr.value;
 		} else if(typeof(expr.value) == "boolean") {
-			return expr.value;
+			if(expr.value == true) {
+				return "true";
+			} else {
+				return "false";
+			}
 		} else if(expr.value == null) {
 			return "null";
 		} else {
@@ -2939,7 +3005,7 @@ phase_PhpGenerator.prototype = {
 			})) {
 				var pos = target.cls.name.pos;
 				var tok = new phase_Token("[identifier]","__attributes__","",pos);
-				target.cls.fields.push(new phase_Field(tok,phase_FieldKind.FVar(new phase_Var(tok,new phase_ArrayLiteral(tok,[])),null),[phase_FieldAccess.APublic,phase_FieldAccess.AStatic],[]));
+				target.cls.fields.push(new phase_Field(tok,phase_FieldKind.FVar(new phase_Var(tok,null,new phase_ArrayLiteral(tok,[],false)),null),[phase_FieldAccess.APublic,phase_FieldAccess.AStatic],[]));
 			}
 		}
 		switch(this.options.attribute) {
@@ -2964,12 +3030,12 @@ phase_PhpGenerator.prototype = {
 			return out;
 		case "on-class":
 			var kind = target.field == null ? "__CLASS__" : target.field;
-			var reg = "" + clsName + "::$" + "__attributes__[\"" + kind + "\"] = " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes)) + ";";
+			var reg = "" + clsName + "::$" + "__attributes__[\"" + kind + "\"] = " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes,false)) + ";";
 			this.append.push(reg);
 			return "";
 		case "phase":
 			var kind = target.field == null ? "__CLASS__" : target.field;
-			var reg = "\\Phase\\Boot::registerAttribute(" + clsName + "::class, \"" + kind + "\", " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes)) + ");";
+			var reg = "\\Phase\\Boot::registerAttribute(" + clsName + "::class, \"" + kind + "\", " + this.visitArrayLiteralExpr(new phase_ArrayLiteral(target.cls.name,attributes,false)) + ");";
 			this.append.push(reg);
 			return "";
 		}
@@ -3133,6 +3199,9 @@ phase_Scanner.prototype = {
 			break;
 		case "#":
 			this.addToken("#");
+			break;
+		case "$":
+			this.addToken("$");
 			break;
 		case "&":
 			this.addToken(this.match("&") ? "&&" : "&");
@@ -3417,8 +3486,9 @@ phase_Namespace.prototype = {
 	}
 	,__class__: phase_Namespace
 };
-var phase_Var = function(name,initializer) {
+var phase_Var = function(name,type,initializer) {
 	this.name = name;
+	this.type = type;
 	this.initializer = initializer;
 };
 phase_Var.__name__ = true;
@@ -3681,6 +3751,673 @@ phase_VisualErrorReporter.prototype = {
 	}
 	,__class__: phase_VisualErrorReporter
 };
+var phase_analysis_Scope = function(parent) {
+	this.children = [];
+	this.values = new haxe_ds_StringMap();
+	this.parent = parent;
+};
+phase_analysis_Scope.__name__ = true;
+phase_analysis_Scope.prototype = {
+	declare: function(name,type) {
+		this.values.h[name] = type;
+	}
+	,resolve: function(name) {
+		if(Object.prototype.hasOwnProperty.call(this.values.h,name)) {
+			return this.values.h[name];
+		}
+		if(this.parent != null) {
+			return this.parent.resolve(name);
+		}
+		return phase_analysis_Type.TUnknown;
+	}
+	,addChild: function(child) {
+		this.children.push(child);
+	}
+	,pushChild: function() {
+		var child = new phase_analysis_Scope(this);
+		this.addChild(child);
+		return child;
+	}
+	,__class__: phase_analysis_Scope
+};
+var phase_analysis_FieldKind = $hxEnums["phase.analysis.FieldKind"] = { __ename__:true,__constructs__:null
+	,TVar: ($_=function(type) { return {_hx_index:0,type:type,__enum__:"phase.analysis.FieldKind",toString:$estr}; },$_._hx_name="TVar",$_.__params__ = ["type"],$_)
+	,TProp: ($_=function(type,getter,setter) { return {_hx_index:1,type:type,getter:getter,setter:setter,__enum__:"phase.analysis.FieldKind",toString:$estr}; },$_._hx_name="TProp",$_.__params__ = ["type","getter","setter"],$_)
+	,TMethod: ($_=function(fun) { return {_hx_index:2,fun:fun,__enum__:"phase.analysis.FieldKind",toString:$estr}; },$_._hx_name="TMethod",$_.__params__ = ["fun"],$_)
+};
+phase_analysis_FieldKind.__constructs__ = [phase_analysis_FieldKind.TVar,phase_analysis_FieldKind.TProp,phase_analysis_FieldKind.TMethod];
+var phase_analysis_Type = $hxEnums["phase.analysis.Type"] = { __ename__:true,__constructs__:null
+	,TUnknown: {_hx_name:"TUnknown",_hx_index:0,__enum__:"phase.analysis.Type",toString:$estr}
+	,TVoid: {_hx_name:"TVoid",_hx_index:1,__enum__:"phase.analysis.Type",toString:$estr}
+	,TPhpScalar: ($_=function(kind) { return {_hx_index:2,kind:kind,__enum__:"phase.analysis.Type",toString:$estr}; },$_._hx_name="TPhpScalar",$_.__params__ = ["kind"],$_)
+	,TPath: ($_=function(tp) { return {_hx_index:3,tp:tp,__enum__:"phase.analysis.Type",toString:$estr}; },$_._hx_name="TPath",$_.__params__ = ["tp"],$_)
+	,TFun: ($_=function(fun) { return {_hx_index:4,fun:fun,__enum__:"phase.analysis.Type",toString:$estr}; },$_._hx_name="TFun",$_.__params__ = ["fun"],$_)
+	,TClass: ($_=function(cls) { return {_hx_index:5,cls:cls,__enum__:"phase.analysis.Type",toString:$estr}; },$_._hx_name="TClass",$_.__params__ = ["cls"],$_)
+	,TInstance: ($_=function(cls) { return {_hx_index:6,cls:cls,__enum__:"phase.analysis.Type",toString:$estr}; },$_._hx_name="TInstance",$_.__params__ = ["cls"],$_)
+};
+phase_analysis_Type.__constructs__ = [phase_analysis_Type.TUnknown,phase_analysis_Type.TVoid,phase_analysis_Type.TPhpScalar,phase_analysis_Type.TPath,phase_analysis_Type.TFun,phase_analysis_Type.TClass,phase_analysis_Type.TInstance];
+var phase_analysis_StaticAnalyzer = function(stmts,reporter) {
+	this.decls = [];
+	this.imports = new haxe_ds_StringMap();
+	this.typedExprs = new haxe_ds_ObjectMap();
+	this.scope = null;
+	this.stmts = stmts;
+	this.reporter = reporter;
+};
+phase_analysis_StaticAnalyzer.__name__ = true;
+phase_analysis_StaticAnalyzer.prototype = {
+	analyze: function() {
+		this.scope = new phase_analysis_Scope();
+		this.imports = new haxe_ds_StringMap();
+		this.typedExprs = new haxe_ds_ObjectMap();
+		var _g = 0;
+		var _g1 = this.stmts;
+		while(_g < _g1.length) {
+			var stmt = _g1[_g];
+			++_g;
+			stmt.accept(this);
+		}
+		return this.typedExprs;
+	}
+	,visitNamespaceStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		var _g = 0;
+		var _g1 = stmt.decls;
+		while(_g < _g1.length) {
+			var decl = _g1[_g];
+			++_g;
+			switch(js_Boot.getClass(decl)) {
+			case phase_Class:
+				var cls = decl;
+				_gthis.scope.declare(cls.name.lexeme,phase_analysis_Type.TClass({ namespace : [], name : cls.name.lexeme, fields : _gthis.extractClassFields(cls)}));
+				break;
+			case phase_Function:
+				var fn = decl;
+				_gthis.scope.declare(fn.name.lexeme,phase_analysis_Type.TFun({ name : fn.name.lexeme, args : [], ret : _gthis.typeFromTypeExpr(fn.ret)}));
+				break;
+			case phase_Var:
+				decl.accept(_gthis);
+				break;
+			default:
+			}
+		}
+		var _g = 0;
+		var _g1 = stmt.decls;
+		while(_g < _g1.length) {
+			var stmt = _g1[_g];
+			++_g;
+			stmt.accept(_gthis);
+		}
+		this.scope = prev;
+	}
+	,visitBlockStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		var _g = 0;
+		var _g1 = stmt.statements;
+		while(_g < _g1.length) {
+			var stmt = _g1[_g];
+			++_g;
+			stmt.accept(_gthis);
+		}
+		this.scope = prev;
+	}
+	,visitExpressionStmt: function(stmt) {
+		stmt.expression.accept(this);
+	}
+	,visitIfStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		var prev1 = _gthis.scope;
+		_gthis.scope = _gthis.scope.pushChild();
+		stmt.condition.accept(_gthis);
+		stmt.thenBranch.accept(_gthis);
+		_gthis.scope = prev1;
+		var prev1 = _gthis.scope;
+		_gthis.scope = _gthis.scope.pushChild();
+		if(stmt.elseBranch != null) {
+			stmt.elseBranch.accept(_gthis);
+		}
+		_gthis.scope = prev1;
+		this.scope = prev;
+	}
+	,visitReturnStmt: function(stmt) {
+		stmt.value.accept(this);
+	}
+	,visitVarStmt: function(stmt) {
+		var type = null;
+		if(stmt.type != null) {
+			type = this.typeFromTypeExpr(stmt.type);
+		}
+		if(stmt.initializer != null) {
+			stmt.initializer.accept(this);
+		}
+		if(type == null) {
+			type = stmt.initializer != null ? this.resolveType(stmt.initializer) : phase_analysis_Type.TUnknown;
+			if(type == null) {
+				type = phase_analysis_Type.TUnknown;
+			}
+		}
+		this.scope.declare(stmt.name.lexeme,type);
+	}
+	,visitGlobalStmt: function(stmt) {
+		this.scope.declare(stmt.name.lexeme,phase_analysis_Type.TUnknown);
+	}
+	,visitUseStmt: function(stmt) {
+		var _this = stmt.path.slice();
+		var result = new Array(_this.length);
+		var _g = 0;
+		var _g1 = _this.length;
+		while(_g < _g1) {
+			var i = _g++;
+			result[i] = _this[i].lexeme;
+		}
+		var namespace = result;
+		var _g = stmt.kind;
+		switch(_g._hx_index) {
+		case 0:
+			var name = namespace.pop();
+			this.imports.h[name] = phase_analysis_Type.TPath({ namespace : namespace, name : name});
+			this.scope.declare(name,phase_analysis_Type.TPath({ namespace : [], name : name}));
+			break;
+		case 1:
+			var target = _g.alias;
+			switch(target._hx_index) {
+			case 0:
+				var alias = target.name;
+				var name = namespace.pop();
+				this.imports.h[alias.lexeme] = phase_analysis_Type.TPath({ namespace : namespace, name : name});
+				this.scope.declare(alias.lexeme,phase_analysis_Type.TPath({ namespace : [], name : alias.lexeme}));
+				break;
+			case 1:
+				var name = target.name;
+				this.imports.h[name.lexeme] = phase_analysis_Type.TFun({ name : name.lexeme, args : [], ret : phase_analysis_Type.TUnknown});
+				break;
+			}
+			break;
+		case 2:
+			var items = _g.items;
+			var _g = 0;
+			while(_g < items.length) {
+				var item = items[_g];
+				++_g;
+				switch(item._hx_index) {
+				case 0:
+					var name = item.name;
+					this.imports.h[name.lexeme] = phase_analysis_Type.TPath({ namespace : namespace, name : name.lexeme});
+					this.scope.declare(name.lexeme,phase_analysis_Type.TPath({ namespace : [], name : name.lexeme}));
+					break;
+				case 1:
+					var name1 = item.name;
+					this.imports.h[name1.lexeme] = phase_analysis_Type.TFun({ name : name1.lexeme, args : [], ret : phase_analysis_Type.TUnknown});
+					break;
+				}
+			}
+			break;
+		}
+	}
+	,visitClassStmt: function(stmt) {
+		var _gthis = this;
+		var cls = { namespace : [], name : stmt.name.lexeme, fields : this.extractClassFields(stmt)};
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		_gthis.scope.declare("this",phase_analysis_Type.TInstance(cls));
+		_gthis.scope.declare("static",phase_analysis_Type.TClass(cls));
+		var _g = 0;
+		var _g1 = stmt.fields;
+		while(_g < _g1.length) {
+			var field = _g1[_g];
+			++_g;
+			field.accept(_gthis);
+		}
+		this.scope = prev;
+		this.scope.declare(stmt.name.lexeme,phase_analysis_Type.TClass(cls));
+	}
+	,extractClassFields: function(stmt) {
+		var _gthis = this;
+		var _g = [];
+		var _g1 = 0;
+		var _g2 = stmt.fields;
+		while(_g1 < _g2.length) {
+			var field = _g2[_g1];
+			++_g1;
+			var _g3 = field.kind;
+			var tmp;
+			switch(_g3._hx_index) {
+			case 0:
+				var _g4 = _g3.type;
+				tmp = null;
+				break;
+			case 1:
+				var _g5 = _g3.v;
+				var type = _g3.type;
+				tmp = { name : field.name.lexeme, kind : phase_analysis_FieldKind.TVar(this.typeFromTypeExpr(type))};
+				break;
+			case 2:
+				var getter = _g3.getter;
+				var setter = _g3.setter;
+				var type1 = _g3.type;
+				tmp = { name : field.name.lexeme, kind : phase_analysis_FieldKind.TProp(this.typeFromTypeExpr(type1),getter != null ? getter.name.lexeme : null,setter != null ? setter.name.lexeme : null)};
+				break;
+			case 3:
+				var fun = _g3.fun;
+				var field1 = field.name.lexeme;
+				var fun1 = fun.name.lexeme;
+				var _this = fun.params;
+				var result = new Array(_this.length);
+				var _g6 = 0;
+				var _g11 = _this.length;
+				while(_g6 < _g11) {
+					var i = _g6++;
+					var arg = _this[i];
+					result[i] = { name : arg.name.lexeme, type : _gthis.typeFromTypeExpr(arg.type)};
+				}
+				tmp = { name : field1, kind : phase_analysis_FieldKind.TMethod({ name : fun1, args : result, ret : this.typeFromTypeExpr(fun.ret)})};
+				break;
+			}
+			_g.push(tmp);
+		}
+		var _g1 = [];
+		var _g11 = 0;
+		var _g2 = _g;
+		while(_g11 < _g2.length) {
+			var v = _g2[_g11];
+			++_g11;
+			if(v != null) {
+				_g1.push(v);
+			}
+		}
+		return _g1;
+	}
+	,visitFieldStmt: function(stmt) {
+		var _g = stmt.kind;
+		switch(_g._hx_index) {
+		case 0:
+			var _g1 = _g.type;
+			break;
+		case 1:
+			var _g1 = _g.v;
+			var _g1 = _g.type;
+			break;
+		case 2:
+			var _g1 = _g.type;
+			var getter = _g.getter;
+			var setter = _g.setter;
+			if(getter != null) {
+				getter.accept(this);
+			}
+			if(setter != null) {
+				setter.accept(this);
+			}
+			break;
+		case 3:
+			var fun = _g.fun;
+			fun.accept(this);
+			break;
+		}
+	}
+	,visitFunctionStmt: function(stmt) {
+		var _gthis = this;
+		var fun = { name : stmt.name.lexeme, args : [], ret : this.typeFromTypeExpr(stmt.ret)};
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		var _g = 0;
+		var _g1 = stmt.params;
+		while(_g < _g1.length) {
+			var arg = _g1[_g];
+			++_g;
+			var type = _gthis.typeFromTypeExpr(arg.type);
+			_gthis.scope.declare(arg.name.lexeme,type);
+			fun.args.push({ name : arg.name.lexeme, type : type});
+		}
+		if(stmt.body != null) {
+			stmt.body.accept(_gthis);
+		}
+		this.scope = prev;
+		this.scope.declare(fun.name,phase_analysis_Type.TFun(fun));
+	}
+	,visitThrowStmt: function(stmt) {
+	}
+	,visitTryStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		stmt.body.accept(_gthis);
+		var _g = 0;
+		var _g1 = stmt.catches;
+		while(_g < _g1.length) {
+			var c = _g1[_g];
+			++_g;
+			var prev1 = _gthis.scope;
+			_gthis.scope = _gthis.scope.pushChild();
+			_gthis.scope.declare(c.name.lexeme,_gthis.typeFromTypeExpr(c.type));
+			c.body.accept(_gthis);
+			_gthis.scope = prev1;
+		}
+		this.scope = prev;
+	}
+	,visitWhileStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		stmt.condition.accept(_gthis);
+		stmt.body.accept(_gthis);
+		this.scope = prev;
+	}
+	,visitForStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		stmt.target.accept(_gthis);
+		_gthis.scope.declare(stmt.key.lexeme,_gthis.resolveType(stmt.target));
+		stmt.body.accept(_gthis);
+		this.scope = prev;
+	}
+	,visitSwitchStmt: function(stmt) {
+		var _gthis = this;
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		stmt.target.accept(_gthis);
+		var _g = 0;
+		var _g1 = stmt.cases;
+		while(_g < _g1.length) {
+			var c = _g1[_g];
+			++_g;
+			var prev1 = _gthis.scope;
+			_gthis.scope = _gthis.scope.pushChild();
+			if(c.condition != null) {
+				c.condition.accept(_gthis);
+			}
+			var _g2 = 0;
+			var _g3 = c.body;
+			while(_g2 < _g3.length) {
+				var item = _g3[_g2];
+				++_g2;
+				item.accept(_gthis);
+			}
+			_gthis.scope = prev1;
+		}
+		this.scope = prev;
+	}
+	,visitAttributeExpr: function(expr) {
+	}
+	,visitArrayLiteralExpr: function(expr) {
+		if(expr.isNative) {
+			this.setType(expr,phase_analysis_Type.TPhpScalar("array"));
+			return;
+		}
+		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Array"}));
+	}
+	,visitMapLiteralExpr: function(expr) {
+		if(expr.isNative) {
+			this.setType(expr,phase_analysis_Type.TPhpScalar("array"));
+			return;
+		}
+		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Map"}));
+	}
+	,visitAssignExpr: function(expr) {
+		this.setType(expr,this.scope.resolve(expr.name.lexeme));
+	}
+	,visitIsExpr: function(expr) {
+		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Bool"}));
+	}
+	,visitBinaryExpr: function(expr) {
+		expr.left.accept(this);
+		expr.right.accept(this);
+		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Bool"}));
+	}
+	,visitCallExpr: function(expr) {
+		expr.callee.accept(this);
+		var calleeType = this.resolveType(expr.callee);
+		if(calleeType == null) {
+			calleeType = phase_analysis_Type.TUnknown;
+		}
+		var _g = 0;
+		var _g1 = expr.args;
+		while(_g < _g1.length) {
+			var arg = _g1[_g];
+			++_g;
+			switch(arg._hx_index) {
+			case 0:
+				var expr1 = arg.expr;
+				expr1.accept(this);
+				break;
+			case 1:
+				var _g2 = arg.name;
+				var expr2 = arg.expr;
+				expr2.accept(this);
+				break;
+			}
+		}
+		switch(calleeType._hx_index) {
+		case 0:
+			this.setType(expr,calleeType);
+			break;
+		case 3:
+			var _g = calleeType.tp;
+			this.setType(expr,calleeType);
+			break;
+		case 4:
+			var fun = calleeType.fun;
+			this.setType(expr,fun.ret);
+			break;
+		case 5:
+			var cls = calleeType.cls;
+			var constructor = Lambda.find(cls.fields,function(f) {
+				return f.name == "new";
+			});
+			if(constructor == null) {
+				throw haxe_Exception.thrown(this.error(expr.paren,"The class " + cls.name + " does not have a constructor"));
+			}
+			this.setType(expr,phase_analysis_Type.TInstance(cls));
+			break;
+		default:
+			throw haxe_Exception.thrown(this.error(expr.paren,"Not a callable"));
+		}
+	}
+	,visitGetExpr: function(expr) {
+		expr.object.accept(this);
+		var type = this.resolveType(expr.object);
+		var tmp;
+		if(js_Boot.getClass(expr.name) == phase_Variable) {
+			var v = expr.name;
+			var name = v.name.lexeme;
+			switch(type._hx_index) {
+			case 5:
+				var cls = type.cls;
+				var f = Lambda.find(cls.fields,function(f) {
+					return f.name == name;
+				});
+				if(f == null) {
+					throw haxe_Exception.thrown(this.error(v.name,"The class " + cls.name + " does not have the field " + name));
+				}
+				var _g = f.kind;
+				switch(_g._hx_index) {
+				case 0:
+					var type1 = _g.type;
+					tmp = type1;
+					break;
+				case 1:
+					var _g1 = _g.getter;
+					var _g1 = _g.setter;
+					var type1 = _g.type;
+					tmp = type1;
+					break;
+				case 2:
+					var fun = _g.fun;
+					tmp = phase_analysis_Type.TFun(fun);
+					break;
+				}
+				break;
+			case 6:
+				var cls = type.cls;
+				var f = Lambda.find(cls.fields,function(f) {
+					return f.name == name;
+				});
+				if(f == null) {
+					throw haxe_Exception.thrown(this.error(v.name,"The class " + cls.name + " does not have the field " + name));
+				}
+				var _g = f.kind;
+				switch(_g._hx_index) {
+				case 0:
+					var type = _g.type;
+					tmp = type;
+					break;
+				case 1:
+					var _g1 = _g.getter;
+					var _g1 = _g.setter;
+					var type = _g.type;
+					tmp = type;
+					break;
+				case 2:
+					var fun = _g.fun;
+					tmp = phase_analysis_Type.TFun(fun);
+					break;
+				}
+				break;
+			default:
+				tmp = phase_analysis_Type.TUnknown;
+			}
+		} else {
+			tmp = phase_analysis_Type.TUnknown;
+		}
+		this.setType(expr,tmp);
+	}
+	,visitSetExpr: function(expr) {
+		this.setType(expr,phase_analysis_Type.TVoid);
+	}
+	,visitSubscriptGetExpr: function(expr) {
+	}
+	,visitSubscriptSetExpr: function(expr) {
+	}
+	,visitGroupingExpr: function(expr) {
+		expr.expression.accept(this);
+		this.setType(expr,this.resolveType(expr.expression));
+	}
+	,visitLambdaExpr: function(expr) {
+	}
+	,visitNamespacedExpr: function(expr) {
+	}
+	,visitTernaryExpr: function(expr) {
+		expr.condition.accept(this);
+		expr.thenBranch.accept(this);
+		expr.elseBranch.accept(this);
+		this.setType(expr,this.resolveType(expr.thenBranch));
+	}
+	,visitLiteralExpr: function(expr) {
+		var v = expr.value;
+		if(typeof(v) == "number" && ((v | 0) === v)) {
+			this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Int"}));
+		} else if(typeof(expr.value) == "boolean") {
+			this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Bool"}));
+		} else {
+			this.setType(expr,phase_analysis_Type.TInstance(phase_analysis_StaticAnalyzer.stringType));
+		}
+	}
+	,visitLogicalExpr: function(expr) {
+		expr.left.accept(this);
+		expr.right.accept(this);
+	}
+	,visitSuperExpr: function(expr) {
+	}
+	,visitThisExpr: function(expr) {
+		var type = this.scope.resolve("this");
+		this.setType(expr,type);
+	}
+	,visitStaticExpr: function(expr) {
+		var type = this.scope.resolve("static");
+		this.setType(expr,type);
+	}
+	,visitTypeExpr: function(expr) {
+		this.setType(expr,this.typeFromTypeExpr(expr));
+	}
+	,visitUnaryExpr: function(expr) {
+		expr.expr.accept(this);
+	}
+	,visitRangeExpr: function(expr) {
+		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Int"}));
+	}
+	,visitVariableExpr: function(expr) {
+		var type = this.scope.resolve(expr.name.lexeme);
+		this.setType(expr,type);
+	}
+	,typeFromTypeExpr: function(expr) {
+		if(expr == null) {
+			return phase_analysis_Type.TUnknown;
+		}
+		var _this = expr.path.slice();
+		var result = new Array(_this.length);
+		var _g = 0;
+		var _g1 = _this.length;
+		while(_g < _g1) {
+			var i = _g++;
+			result[i] = _this[i].lexeme;
+		}
+		var namespace = result;
+		var name = namespace.pop();
+		if(!expr.absolute) {
+			if(namespace.length == 0) {
+				if(Object.prototype.hasOwnProperty.call(this.imports.h,name)) {
+					return this.imports.h[name];
+				}
+			}
+		}
+		return phase_analysis_Type.TPath({ namespace : namespace, name : name});
+	}
+	,setType: function(expr,type) {
+		var value;
+		if(type._hx_index == 3) {
+			var _g = type.tp;
+			value = _g.name == "String" ? _g.namespace.length == 0 ? phase_analysis_Type.TInstance(phase_analysis_StaticAnalyzer.stringType) : type : type;
+		} else {
+			value = type;
+		}
+		this.typedExprs.set(expr,value);
+	}
+	,resolveType: function(expr) {
+		var type = this.typedExprs.h[expr.__id__];
+		if(type == null) {
+			return phase_analysis_Type.TUnknown;
+		}
+		if(type == null) {
+			return type;
+		} else if(type._hx_index == 3) {
+			var _g = type.tp;
+			if(_g.name == "String") {
+				if(_g.namespace.length == 0) {
+					return phase_analysis_Type.TInstance(phase_analysis_StaticAnalyzer.stringType);
+				} else {
+					return type;
+				}
+			} else {
+				return type;
+			}
+		} else {
+			return type;
+		}
+	}
+	,wrapScope: function(cb) {
+		var prev = this.scope;
+		this.scope = this.scope.pushChild();
+		cb();
+		this.scope = prev;
+	}
+	,error: function(token,message) {
+		this.reporter.report(token.pos,token.lexeme,message);
+		return new phase_analysis_TypeError();
+	}
+	,__class__: phase_analysis_StaticAnalyzer
+};
+var phase_analysis_TypeError = function() {
+};
+phase_analysis_TypeError.__name__ = true;
+phase_analysis_TypeError.prototype = {
+	__class__: phase_analysis_TypeError
+};
 var sys_FileSystem = function() { };
 sys_FileSystem.__name__ = true;
 sys_FileSystem.exists = function(path) {
@@ -3855,7 +4592,7 @@ phase_PhpGenerator.typeAliases = (function($this) {
 	var _g = new haxe_ds_StringMap();
 	_g.h["String"] = "string";
 	_g.h["Int"] = "int";
-	_g.h["Array"] = "array";
+	_g.h["Array"] = "\\Std\\PhaseArray";
 	_g.h["Callable"] = "callable";
 	_g.h["Any"] = "mixed";
 	_g.h["Scalar"] = "scalar";
@@ -3904,4 +4641,5 @@ phase_Scanner.keywords = (function($this) {
 	$r = _g;
 	return $r;
 }(this));
+phase_analysis_StaticAnalyzer.stringType = { namespace : [], name : "String", fields : [{ name : "toLowerCase", kind : phase_analysis_FieldKind.TMethod({ name : "toLowerCase", args : [], ret : phase_analysis_Type.TPath({ namespace : [], name : "String"})})},{ name : "toUpperCase", kind : phase_analysis_FieldKind.TMethod({ name : "toUpperCase", args : [], ret : phase_analysis_Type.TPath({ namespace : [], name : "String"})})},{ name : "split", kind : phase_analysis_FieldKind.TMethod({ name : "split", args : [{ name : "sep", type : phase_analysis_Type.TPath({ namespace : [], name : "String"})}], ret : phase_analysis_Type.TPath({ namespace : [], name : "Array"})})}]};
 })(typeof exports != "undefined" ? exports : typeof window != "undefined" ? window : typeof self != "undefined" ? self : this, typeof window != "undefined" ? window : typeof global != "undefined" ? global : typeof self != "undefined" ? self : this);

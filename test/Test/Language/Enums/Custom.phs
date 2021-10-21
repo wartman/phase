@@ -1,6 +1,6 @@
 namespace Test::Language::Enums {
 
-  enum Custom {
+  enum Custom as String {
     Foo = 'Foo'
     Bar = 'Bar'
   }
