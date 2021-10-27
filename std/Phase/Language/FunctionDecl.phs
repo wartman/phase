@@ -1,0 +1,13 @@
+namespace Phase::Language {
+
+  class FunctionDecl {
+    new(
+      this.name: String,
+      this.params: Array<FunctionArg>,
+      this.body: Stmt,
+      this.ret: TypePath,
+      this.attributes: Array<Expr>
+    ) {}
+  }
+
+}

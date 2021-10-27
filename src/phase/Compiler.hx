@@ -15,20 +15,23 @@ class Compiler {
 
   final src:String;
   final dst:String;
+  final libs:Array<String>;
   final reporterFactory:(source:String)->ErrorReporter;
   final extensions = [ 'phs', 'phase' ];
   final onComplete:Null<(modules:Array<Module>)->Void>;
 
-  public function new(src, dst, reporterFactory, ?onComplete) {
+  public function new(src, dst, libs, reporterFactory, ?onComplete) {
     this.src = src;
     this.dst = dst;
+    this.libs = libs;
     this.reporterFactory = reporterFactory;
     this.onComplete = onComplete;
   }
 
   public function compile() {
     try {
-      var modules = compileDir();
+      var server = new Server(new Io(libs.concat([ src ])), reporterFactory);
+      var modules = compileDir(null, null, server);
       writeModules(modules); 
       Sys.println('Compiled:\n' + [ for (m in modules) '- ' + m.name].join('\n'));
       if (onComplete != null) {
@@ -38,11 +41,8 @@ class Compiler {
       Sys.println('Compiling failed');
     }
   }
-
-  // Todo: this loading code is a mess. Come up with something less brittle.
-  //       Mostly this is to do with the wild way i decided to iterate
-  //       over files.
-  function compileDir(?dir:String, ?modules:Array<Module>):Array<Module> {
+  
+  function compileDir(?dir:String, ?modules:Array<Module>, server:Server):Array<Module> {
     var fullPath = dir != null ? Path.join([ src, dir ]) : src;
     if (modules == null) modules = [];
 
@@ -50,12 +50,12 @@ class Compiler {
       var file = Path.join([ dir, name ]);
       var fullFilePath = Path.join([src, file]);
       if (fullFilePath.isDirectory()) {
-        compileDir(file, modules);
+        compileDir(file, modules, server);
       } else if (extensions.has(file.extension())) {
         var relName = file.withoutExtension();
         modules.push({
           name: relName, 
-          content: compileFile(fullFilePath)
+          content: compileFile(fullFilePath, server)
         }); 
       }
     }
@@ -63,12 +63,12 @@ class Compiler {
     return modules;
   }
 
-  function compileFile(path:String) {
+  function compileFile(path:String, server:Server) {
     var source = load(path);
     var reporter = reporterFactory(source);
     var scanner = new Scanner(source, path, reporter);
     var parser = new Parser(scanner.scan(), reporter);
-    var generator = new PhpGenerator(parser.parse(), reporter);
+    var generator = new PhpGenerator(parser.parse(), reporter, server);
     
     var data = generator.generate();
     if (reporter.hadError()) {

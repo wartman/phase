@@ -1,7 +1,7 @@
 namespace Phase {
 
   class Generator {
-    private statements:Array
+    private statements: Array
     private reporter: ErrorReporter
 
     new(

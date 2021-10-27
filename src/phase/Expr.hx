@@ -1,5 +1,7 @@
 package phase;
 
+import phase.Stmt.SwitchCase;
+
 @:autoBuild(phase.tools.AstBuilder.buildNode())
 interface Expr {
   public function accept<T>(visitor:ExprVisitor<T>):T;
@@ -136,4 +138,10 @@ class Namespaced implements Expr {
 
 class Variable implements Expr {
   var name:Token;
+}
+
+@:native('Phs_Match')
+class Match implements Expr {
+  var target:Expr;
+  var cases:Array<SwitchCase>;
 }

@@ -1,0 +1,12 @@
+namespace Phase::Language {
+
+  class FunctionArg {
+    new(
+      this.name: Token,
+      this.typeHint: ?TypePath,
+      this.expr: ?Expr,
+      this.isInit: Bool = false
+    ) {}
+  }
+
+}

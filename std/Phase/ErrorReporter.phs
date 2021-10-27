@@ -1,0 +1,9 @@
+namespace Phase {
+
+  use Phase::Language::Position
+
+  interface ErrorReporter {
+    report(pos: Position, message: String)
+  }
+
+}

@@ -12,6 +12,8 @@ class StaticAnalyzer
   // @todo: This should NOT be hard-coded like this 
   public static final stringType:ClassType = {
     namespace: [],
+    superclass: null,
+    interfaces: [],
     name: 'String',
     fields: [
       { 
@@ -45,13 +47,15 @@ class StaticAnalyzer
 
   final stmts:Array<Stmt>;
   final reporter:ErrorReporter;
+  final server:Server;
   var scope:Scope = null;
   var typedExprs:Map<Expr, Type> = [];
+  var typedDecls:Map<String, Type> = [];
   var imports:Map<String, Type> = [];
-  var decls:Array<Type> = [];
 
-  public function new(stmts, reporter) {
+  public function new(stmts, server, reporter) {
     this.stmts = stmts;
+    this.server = server;
     this.reporter = reporter;
   }
 
@@ -59,33 +63,53 @@ class StaticAnalyzer
     scope = new Scope();
     imports = new Map();
     typedExprs = new Map();
+    typedDecls = new Map();
 
     for (stmt in stmts) stmt.accept(this);
 
-    return typedExprs;    
+    return new Context(typedExprs, typedDecls);
   }
 
   public function visitNamespaceStmt(stmt:Stmt.Namespace):Void {
     wrapScope(() -> {
-      // Hoist class and funciton declarations first
+      var ns = stmt.path.map(s -> s.lexeme);
+
+      // Get class and funciton declarations first. This allows declarations
+      // to be hoisted, at least for the top level (and we'll need to work
+      // on that).
       for (decl in stmt.decls) {
         switch HxType.getClass(decl) {
           case Stmt.Var:
             decl.accept(this);
           case Stmt.Function:
             var fn:Stmt.Function = cast decl;
-            scope.declare(fn.name.lexeme, TFun({
+            var fun = TFun({
               name: fn.name.lexeme,
               args: [],
               ret: typeFromTypeExpr(fn.ret)
-            }));
+            });
+            scope.declare(fn.name.lexeme, fun);
+            typedDecls.set(ns.concat([ fn.name.lexeme ]).join('::'), fun);
+            typedDecls.set(fn.name.lexeme, fun);
           case Stmt.Class:
             var cls:Stmt.Class = cast decl;
-            scope.declare(cls.name.lexeme, TClass({
-              namespace: [],
+            
+            if (cls.superclass != null) cls.superclass.accept(this);
+            for (i in cls.interfaces) i.accept(this);
+            
+            var type = TClass({
+              namespace: ns,
+              superclass: cls.superclass == null 
+                ? null
+                : typedExprs.get(cls.superclass),
+              interfaces: cls.interfaces.map(i -> typedExprs.get(i)),
               name: cls.name.lexeme,
               fields: extractClassFields(cls)
-            }));
+            });
+
+            scope.declare(cls.name.lexeme, type);
+            typedDecls.set(ns.concat([ cls.name.lexeme ]).join('::'), type);
+            typedDecls.set(cls.name.lexeme, type);
           default:
         }
       }
@@ -123,7 +147,10 @@ class StaticAnalyzer
   public function visitVarStmt(stmt:Stmt.Var) {
     var type:Type = null;
     if (stmt.type != null) {
-      type = typeFromTypeExpr(stmt.type);
+      type = switch typeFromTypeExpr(stmt.type) {
+        case TClass(cls): TInstance(cls);
+        case other: other;
+      }
     }
     if (stmt.initializer != null) {
       stmt.initializer.accept(this);
@@ -167,9 +194,16 @@ class StaticAnalyzer
   }
 
   public function visitClassStmt(stmt:Stmt.Class):Void {
+    if (stmt.superclass != null) stmt.superclass.accept(this);
+    for (i in stmt.interfaces) i.accept(this);
+
     var cls:ClassType = {
       namespace: [],
       name: stmt.name.lexeme,
+      superclass: stmt.superclass != null 
+        ? typedExprs.get(stmt.superclass)
+        : null,
+      interfaces: stmt.interfaces.map(i -> typedExprs.get(i)),
       fields: extractClassFields(stmt)
     };
     wrapScope(() -> {
@@ -179,6 +213,7 @@ class StaticAnalyzer
         field.accept(this);
       }
     });
+
     scope.declare(stmt.name.lexeme, TClass(cls));
   }
 
@@ -283,6 +318,16 @@ class StaticAnalyzer
       });
     });
   }
+  
+  public function visitMatchExpr(expr:Expr.Match):Void {
+    wrapScope(() -> {
+      expr.target.accept(this);
+      for (c in expr.cases) wrapScope(() -> {
+        if (c.condition != null) c.condition.accept(this);
+        for (item in c.body) item.accept(this);
+      });
+    });
+  }
 
   public function visitAttributeExpr(expr:Expr.Attribute) {
     // noop?
@@ -305,6 +350,9 @@ class StaticAnalyzer
   }
 
   public function visitAssignExpr(expr:Expr.Assign):Void {
+    if (!scope.isDeclared(expr.name.lexeme)) {
+      throw error(expr.name, 'Invalid assignment');
+    }
     setType(expr, scope.resolve(expr.name.lexeme));
   }
 
@@ -337,10 +385,11 @@ class StaticAnalyzer
       case TFun(fun):
         setType(expr, fun.ret);
       case TClass(cls):
-        var constructor = cls.fields.find(f -> f.name == 'new');
-        if (constructor == null) {
-          throw error(expr.paren, 'The class ${cls.name} does not have a constructor');
-        }
+        // // Todo: we'll need to scan superclasses for this to work
+        // var constructor = cls.fields.find(f -> f.name == 'new');
+        // if (constructor == null) {
+        //   throw error(expr.paren, 'The class ${cls.name} does not have a constructor');
+        // }
         setType(expr, TInstance(cls));
       default:
         throw error(expr.paren, 'Not a callable');
@@ -356,7 +405,9 @@ class StaticAnalyzer
       case Expr.Variable:
         var v:Expr.Variable = cast expr.name;
         var name = v.name.lexeme;
-        switch type {
+        if (name == 'class') {
+          TInstance(stringType);
+        } else switch type {
           // Todo: split instance and class fields
           case TClass(cls) | TInstance(cls):
             var f = cls.fields.find(f -> f.name == name);
@@ -466,6 +517,10 @@ class StaticAnalyzer
     if (!expr.absolute) {
       if (namespace.length == 0) {
         if (imports.exists(name)) return imports.get(name);
+        switch scope.resolve(name) {
+          case TUnknown:
+          case other: return other;
+        }
       }
     }
 

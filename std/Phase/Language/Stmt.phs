@@ -1,7 +1,10 @@
 namespace Phase::Language {
 
-  interface Stmt {
-    accept(visitor:StmtVisitor)
+  class Stmt {
+    new(
+      this.stmt: StmtDef,
+      this.position: Position
+    ) {}
   }
 
 }

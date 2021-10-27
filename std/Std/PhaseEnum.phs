@@ -1,0 +1,11 @@
+namespace Std {
+
+  class PhaseEnum {
+    new(
+      this.index: Int,
+      this.tag: String,
+      this.params: Array
+    ) {}
+  }
+
+}

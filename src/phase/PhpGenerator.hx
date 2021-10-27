@@ -1,9 +1,11 @@
 package phase;
 
 import phase.analysis.StaticAnalyzer;
+
 using Type;
 using StringTools;
 using Lambda;
+using phase.analysis.TypeTools;
 
 enum GeneratorMode {
   GeneratingRoot;
@@ -49,6 +51,7 @@ class PhpGenerator
   final options:PhpGeneratorOptions;
   final stmts:Array<Stmt>;
   final reporter:ErrorReporter;
+  final server:Server;
   var mode:GeneratorMode = GeneratingRoot;
   var closureCaptures:Array<String> = [];
   var scope:PhpScope;
@@ -56,16 +59,18 @@ class PhpGenerator
   var indentLevel:Int = 0;
   var uid:Int = 0;
   var append:Array<String> = [];
-  var typedExprs:Map<Expr, phase.analysis.Type> = [];
+  var context:phase.analysis.Context = null;
   var isCall:Bool = false;
 
   public function new(
     stmts:Array<Stmt>,
     reporter:ErrorReporter,
+    server:Server,
     ?options:PhpGeneratorOptions
   ) {
     this.options = options == null  ? {} : options;
     this.stmts = stmts;
+    this.server = server;
     this.reporter = reporter;
 
     if (this.options.version == null) {
@@ -81,10 +86,10 @@ class PhpGenerator
 
   public function generate():String {
     append = [];
-    scope = new PhpScope();
+    scope = new PhpScope(); // todo: get rid of this
 
-    var analysis = new StaticAnalyzer(stmts, reporter);
-    typedExprs = analysis.analyze();
+    var analysis = new StaticAnalyzer(stmts, server, reporter);
+    context = analysis.analyze();
 
     var out:Array<String> = [];
     for (stmt in stmts) {
@@ -213,7 +218,7 @@ class PhpGenerator
     scope.define(stmt.name.lexeme, PhpType);
     
     if (stmt.superclass != null) {
-      out += ' extends ' + stmt.superclass.lexeme;
+      out += ' extends ' + generateExpr(stmt.superclass);
     }
 
     if (stmt.interfaces.length > 0) {
@@ -222,7 +227,7 @@ class PhpGenerator
         case KindInterface: ' extends ';
         case KindTrait: ''; // should not be reachable
       }
-      out += stmt.interfaces.map(t -> t.lexeme).join(', ');
+      out += stmt.interfaces.map(generateExpr).join(', ');
     }
 
     out += '\n' + getIndent() + '{\n';
@@ -471,6 +476,98 @@ class PhpGenerator
     return out;
   }
 
+  public function visitMatchExpr(expr:Expr.Match):String {
+    var type = typeOf(expr.target);
+    switch type {
+      case TInstance(cls): 
+        var superclass = findType(cls.superclass);
+        switch superclass {
+          case TClass({ 
+            name: 'PhaseEnum',
+            namespace: [ 'Std' ],
+            superclass: _,
+            interfaces: _,
+            fields: _
+          }):
+            return generateEnumMatch(expr, cls);
+          default:
+        }
+      default:
+    }
+  
+    return '';
+  }
+
+  function generateEnumMatch(expr:Expr.Match, cls:phase.analysis.Type.ClassType):String {
+    var temp = tempVar('matcher');
+    var out = "$" + temp + ' = ' + generateExpr(expr.target) + ';\n';
+    var body:Array<String> = [];
+    // var handled:Array<String> = [];
+    // var hasDefault = false;
+
+    scope.push();
+    scope.define(temp, PhpVar);
+
+    for (c in expr.cases) {
+      switch Std.downcast(c.condition, Expr.Call) {
+        case null:
+        case matcher:
+          var name = generateExpr(matcher.callee);
+          if (cls.fields.exists(f -> f.name == name)) {
+            var checks:Array<String> = [
+              generateExpr(
+                CodeBuilder.generateExpr('$temp.tag == "$name";', matcher.paren.pos, reporter)
+              )
+            ];
+            var extracts:Array<String> = [];
+
+            indent();
+
+            for (arg in matcher.args) switch arg {
+              case Positional(expr): switch Std.downcast(expr, Expr.Variable) {
+                case null:
+                  var i = matcher.args.indexOf(arg);
+                  checks.push(
+                    generateExpr(
+                      CodeBuilder.generateExpr('$temp.params[$i];', matcher.paren.pos, reporter)
+                    )
+                    + ' === ' + generateExpr(expr)
+                  );
+                case variable:
+                  var name = safeVar(variable.name);
+                  var i = matcher.args.indexOf(arg);
+                  extracts.push(
+                    generateStmt(
+                      CodeBuilder.generate('var $name = $temp.params[${i}];', matcher.paren.pos, reporter)[0]
+                    )
+                  );
+              }
+              case Named(name, expr):
+                throw error(matcher.paren, 'Cant use named args yet');
+            };
+            var code = 'if (${ checks.join(' && ') }) { \n';
+            
+            code += extracts.length > 0 
+              ? extracts.join('') + '\n'
+              : '';
+            code += c.body.map(generateStmt).join('');
+
+            outdent();
+            
+            code += '\n' + getIndent() + '}';
+
+            body.push(code);
+          } else {
+            throw error(matcher.paren, '$name is not a vaid constructor');
+          }
+      }
+    }
+
+    scope.pop();
+
+    return out + getIndent() + body.join(getIndent() + 'else ');
+  }
+
   public function visitAttributeExpr(expr:Expr.Attribute):String {
     var name = expr.path.map(t -> t.lexeme).join('\\');
     function generateArg(arg:Expr.CallArgument) return switch arg {
@@ -531,8 +628,8 @@ class PhpGenerator
 
   public function visitAssignExpr(expr:Expr.Assign):String {
     var name = safeVar(expr.name);
-    var kind:PhpKind = scope.get(name);
-    if (kind != PhpVar) throw error(expr.name, 'Invalid assignment');
+    // var kind:PhpKind = scope.get(name);
+    // if (kind != PhpVar) throw error(expr.name, 'Invalid assignment');
     return '$' + name + ' = ${generateExpr(expr.value)}';
   }
 
@@ -550,12 +647,22 @@ class PhpGenerator
 
   public function visitCallExpr(expr:Expr.Call):String {
     isCall = true;
-    // todo: rework to use the static analyzer once it's working better
-    var callee = switch expr.callee.getClass() {
-      case Expr.Type:
-        // Initializer
+    var type = context.typeOf(expr.callee);
+    var callee = switch type {
+      case TPath(_) | TClass(_):
         'new ' + generateExpr(expr.callee);
-      default: generateExpr(expr.callee);
+      case TPhpScalar(kind):
+        throw error(expr.paren, '$kind is not callable');
+      case TInstance(_):
+        throw error(expr.paren, 'Cannot call an instance of ${type.getTypeName()}');
+      default:
+        // fallback behavior 
+        switch expr.callee.getClass() {
+          case Expr.Type:
+            'new ' + generateExpr(expr.callee);
+          default: 
+            generateExpr(expr.callee);
+        }
     }
     isCall = false;
     return '$callee(' + expr.args.map(arg -> switch arg {
@@ -565,7 +672,7 @@ class PhpGenerator
   }
 
   public function visitGetExpr(expr:Expr.Get):String {
-    var objectType = typedExprs.get(expr.object);
+    var objectType = context.typeOf(expr.object);
     switch objectType {
       case TInstance(StaticAnalyzer.stringType):
         // @todo: this is just a proof of concept -- we need a 
@@ -573,6 +680,43 @@ class PhpGenerator
         var name = getProperty(expr.name, false);
         var str = generateExpr(expr.object);
         return '(new \\Std\\PhaseString(' + str + '))->' + name;
+      // case TInstance(_):
+      //   switch Type.getClass(expr.name) {
+      //     case Expr.Variable:
+      //       var e:Expr.Variable = cast expr.name;
+      //       var tok = e.name;
+      //       switch tok.type {
+      //         case TokIdentifier: 
+      //           var name = safeVar(e.name);
+      //           return generateExpr(expr.object) + '->' + name;
+      //         default: 
+      //           // safeVar(e.name);
+      //       }
+      //     default:
+      //   }
+      // case TClass(cls):
+      //   switch Type.getClass(expr.name) {
+      //     case Expr.Variable:
+      //       var e:Expr.Variable = cast expr.name;
+      //       var tok = e.name;
+      //       switch tok.type {
+      //         case TokIdentifier: 
+      //           var name = tok.lexeme;
+      //           var field = cls.fields.find(f -> f.name == name);
+      //           if (field == null) {
+      //             throw error(tok, 'No property with the name $name exists on ${cls.name}');
+      //           }
+      //           return generateExpr(expr.object) + '::' + switch field.kind {
+      //             case TVar(_): '$$' + safeVar(tok);
+      //             default: safeVar(tok);
+      //           };
+      //         case TokClass:
+      //           return generateExpr(expr.object) + '::class';
+      //         default: 
+      //           // safeVar(e.name);
+      //       }
+      //     default:
+      //   }
       default:
     }
 
@@ -860,6 +1004,23 @@ class PhpGenerator
   function error(token:Token, message:String) {
     reporter.report(token.pos, token.lexeme, message);
     return new GeneratorError();
+  }
+
+  function typeOf(expr:Expr) {
+    return switch context.typeOf(expr) {
+      case TPath(tp): 
+        trace(tp);
+        server.locateType(tp.namespace.concat([ tp.name ]).join('::'));
+      case other: 
+        other;
+    }
+  }
+
+  function findType(type:phase.analysis.Type) {
+    return switch type {
+      case TPath(tp): server.locateType(tp.namespace.concat([ tp.name ]).join('::'));
+      case other: other;
+    }
   }
 
 }

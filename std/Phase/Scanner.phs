@@ -5,40 +5,9 @@ namespace Phase {
   class Scanner {
     static keywords = [
       TokenType.TokClass: TokenType.TokClass,
-      TokenType.TokInterface: TokenType.TokInterface,
-      TokenType.TokTrait: TokenType.TokTrait,
-      TokenType.TokEnum: TokenType.TokEnum,
-      TokenType.TokExtends: TokenType.TokExtends,
-      TokenType.TokImplements: TokenType.TokImplements,
-      TokenType.TokEnum: TokenType.TokEnum,
-      TokenType.TokStatic: TokenType.TokStatic,
-      TokenType.TokPrivate: TokenType.TokPrivate,
-      TokenType.TokPublic: TokenType.TokPublic,
-      TokenType.TokAbstract: TokenType.TokAbstract,
-      TokenType.TokConst: TokenType.TokConst,
-      TokenType.TokFalse: TokenType.TokFalse,
-      TokenType.TokTrue: TokenType.TokTrue,
-      TokenType.TokElse: TokenType.TokElse,
-      TokenType.TokFunction: TokenType.TokFunction,
-      TokenType.TokFor: TokenType.TokFor,
-      TokenType.TokIf: TokenType.TokIf,
-      TokenType.TokNull: TokenType.TokNull,
-      TokenType.TokReturn: TokenType.TokReturn,
-      TokenType.TokSuper: TokenType.TokSuper,
-      TokenType.TokThis: TokenType.TokThis,
-      TokenType.TokVar: TokenType.TokVar,
-      TokenType.TokWhile: TokenType.TokWhile,
-      TokenType.TokUse: TokenType.TokUse,
-      TokenType.TokPackage: TokenType.TokPackage,
-      TokenType.TokAs: TokenType.TokAs,
-      TokenType.TokIn: TokenType.TokIn,
-      TokenType.TokIs: TokenType.TokIs,
-      TokenType.TokThrow: TokenType.TokThrow,
-      TokenType.TokTry: TokenType.TokTry,
-      TokenType.TokCatch: TokenType.TokCatch,
-      TokenType.TokSwitch: TokenType.TokSwitch,
-      TokenType.TokCase: TokenType.TokCase,
-      TokenType.TokDefault: TokenType.TokDefault
+      TokenType.TokEnum : TokenType.TokEnum
+
+      // etc
     ]
 
     private source: Source
@@ -66,48 +35,10 @@ namespace Phase {
       return this.tokens
     }
 
-    this.scanToken() {
+    scanToken() {
       var c = this.advance()
       switch (c) {
-        case '(': this.addToken(TokenType.TokLeftParen)
-        case ')': this.addToken(TokenType.TokRightParen)
-        case '{': this.addToken(TokenType.TokRightBrace)
-        case '}': this.addToken(TokenType.TokLeftBrace)
-        case '[': this.addToken(TokenType.TokLeftBracket)
-        case ']': this.addToken(TokenType.TokRightBracket)
-        case '|': this.addToken(this.match('|') ? TokenType.TokBoolOr : this.match('>') ? TokenType.TokPipe : TokenType.TokBar)
-        case '&': this.addToken(this.match('&') ? TokenType.TokBoolAnd : TokenType.TokAnd)
-        case ',': this.addToken(TokenType.TokComma)
-        case '.': this.addToken(this.match('.') ? TokenType.TokRange : TokenType.TokDot)
-        case '-': this.addToken(this.match('-') ? TokenType.TokMinusMinus : TokenType.TokMinus)
-        case '+': 
-          if (this.match('=')) {
-            this.addToken(TokenType.TokPlusEqual)
-          } else if(this.match('+')) {
-            this.addToken(this.match('+') ? TokenType.TokConcat : TokenType.TokPlusPlus)
-          } else {
-            this.addToken(TokenType.TokPlus)
-          }
-        case '': this.addToken(TokenType.TokSemicolon)
-        case ':': this.addToken(this.match(':') ? TokenType.TokScopeResolutionOperator : TokenType.TokColon)
-        case '*': this.addToken(TokenType.TokStar)
-        case '@': this.addToken(TokenType.TokAt)
-        case '#': this.addToken(TokenType.TokSharp)
-        case '!': this.addToken(this.match('=') ? TokenType.TokBangEqual : TokenType.TokBang)
-        case '=': this.addToken(this.match('=') ? TokenType.TokBoolEqual : TokenType.TokEqual)
-        case '<': this.addToken(this.match('=') ? TokenType.TokLessEqual : TokenType.TokLess)
-        case '>': this.addToken(this.match('=') ? TokenType.TokGreaterEqual : TokenType.TokGreater)
-        case '/':
-          if (this.match('/')) {
-            // Comment -- ignore
-            while (this.peek() != '\n' && !this.isAtEnd()) this.advance()
-            if (this.peek() == '\n') {
-
-            } 
-          } else {
-            this.addToken(TokenType.TokSlash)
-          }
-        // etc
+        // todo
       }
     }
 

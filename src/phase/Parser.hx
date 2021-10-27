@@ -1,5 +1,6 @@
 package phase;
 
+import phase.Stmt.FunctionArg;
 using Lambda;
 
 class Parser {
@@ -27,7 +28,7 @@ class Parser {
     this.reporter = reporter;
   }
 
-  public function parse() {
+  public function parse():Array<Stmt> {
     var stmts:Array<Stmt> = [];
     current = 0;
 
@@ -41,7 +42,7 @@ class Parser {
 
   function declaration(?attribute:Array<Expr>):Stmt {
     if (attribute == null) attribute = [];
-    try {
+    // try {
       if (match([ TokLeftBracket ])) return declaration(attributeList());
       if (match([ TokVar ])) {
         if (attribute.length > 0) {
@@ -63,10 +64,10 @@ class Parser {
       if (match([ TokUse ])) return useDeclaration(attribute);
       if (match([ TokNamespace ])) return packageDeclaration(attribute);
       return statement();
-    } catch (error:ParserError) {
-      synchronize();
-      return null;
-    }
+    // } catch (error:ParserError) {
+    //   synchronize();
+    //   return null;
+    // }
   }
 
   function statement():Stmt {
@@ -270,12 +271,12 @@ class Parser {
 
   function interfaceDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a class name. Must start uppercase.');
-    var interfaces:Array<Token> = [];
+    var interfaces:Array<Expr.Type> = [];
     var fields:Array<Stmt.Field> = [];
 
     ignoreNewlines();
     while (match([ TokExtends ]) && !isAtEnd()) {
-      interfaces.push(consume(TokTypeIdentifier, 'Expect an interface name'));
+      interfaces.push(parseTypePath());
       ignoreNewlines();
     }
 
@@ -313,52 +314,92 @@ class Parser {
     return new Stmt.Class(name, KindTrait, null, [], fields, attribute);
   }
 
-  // @todo: this is a temporary solution. I want ADT style types like Haxe
-  //        has if at all possible. 
   function enumDeclaration(attribute:Array<Expr>) {
-    var name = consume(TokTypeIdentifier, 'Expect an enum name. Must start uppercase.');
-    var superClass:Token = null;
+    var enumName = consume(TokTypeIdentifier, 'Expect an enum name. Must start uppercase.');
     var fields:Array<Stmt.Field> = [];
 
-    consume(TokAs, 'Expected an `as`');
+    if (match([ TokAs ])) {
+      var superClass = consume(TokTypeIdentifier, 'Expect a wrapped type name');
+  
+      consume(TokLeftBrace, "Expect '{' before enum body.");
+      ignoreNewlines();
+      
+      var index = 0;
+      while (!check(TokRightBrace) && !isAtEnd()) {
+        ignoreNewlines();
+        var fieldName = consume(TokTypeIdentifier, "Expect an uppercase identifier");
+        var value:Expr = if (match([ TokEqual ])) {
+          expression();
+        } else switch superClass.lexeme {
+          case 'String': new Expr.Literal(fieldName.lexeme);
+          case 'Int': new Expr.Literal(index);
+          case _: throw error(superClass, 'Unknown type -- currently enums may only be Strings or Ints');
+        }
+        index++;
+        expectEndOfStatement();
+        fields.push(new Stmt.Field(
+          fieldName,
+          FVar(new Stmt.Var(fieldName, null, value), null),
+          [ AConst ],
+          []
+        ));
+      }
+  
+      ignoreNewlines();
+      consume(TokRightBrace, "Expect '}' at end of enum body");
+      ignoreNewlines();
     
-    superClass = consume(TokTypeIdentifier, 'Expect a wrapped type name');
+      return new Stmt.Class(enumName, KindClass, null, [], fields, attribute);
+    }
 
-    consume(TokLeftBrace, "Expect '{' before trait body.");
+    consume(TokLeftBrace, "Expect '{' before enum body.");
     ignoreNewlines();
-    
     var index = 0;
+
     while (!check(TokRightBrace) && !isAtEnd()) {
       ignoreNewlines();
-      var fieldName = consume(TokTypeIdentifier, "Expect an uppercase identifier");
-      var value:Expr = if (match([ TokEqual ])) {
-        expression();
-      } else switch superClass.lexeme {
-        case 'String': new Expr.Literal(fieldName.lexeme);
-        case 'Int': new Expr.Literal(index);
-        case _: throw error(superClass, 'Unknown type -- currently enums may only be Strings or Ints');
+      var name = consume(TokTypeIdentifier, 'Expect an uppercase identifier');
+      var params:Array<FunctionArg> = [];
+      var ret = new Expr.Type([ enumName ], false);
+
+      if (!check(TokNewline)) {
+        consume(TokLeftParen, 'Expect \'(\' after function name.');
+        params = functionParams(false);
       }
-      index++;
+
+      var body = CodeBuilder.generate('{ return ${enumName.lexeme}(
+        ${index++},
+        "${name.lexeme}",
+        [ ${params.map(p -> p.name.lexeme).join(', ')} ]
+      ) }', enumName.pos, reporter);
+
       expectEndOfStatement();
+
       fields.push(new Stmt.Field(
-        fieldName,
-        FVar(new Stmt.Var(fieldName, null, value), null),
-        [ AConst ],
-        []
+        name,
+        FFun(new Stmt.Function(name, params, body[0], ret, [])),
+        [ APublic, AStatic ],
+        attribute
       ));
     }
 
     ignoreNewlines();
-    consume(TokRightBrace, "Expect '}' at end of trait body");
+    consume(TokRightBrace, "Expect '}' at end of enum body");
     ignoreNewlines();
-  
-    return new Stmt.Class(name, KindClass, null, [], fields, attribute);
+
+    return new Stmt.Class(enumName, KindClass, new Expr.Type(
+      [ 
+        new Token(TokTypeIdentifier, 'Std', 'Std', enumName.pos),
+        new Token(TokTypeIdentifier, 'PhaseEnum', 'PhaseEnum', enumName.pos)
+      ],
+      true
+    ), [], fields, attribute);
   }
 
   function classDeclaration(attribute:Array<Expr>) {
     var name = consume(TokTypeIdentifier, 'Expect a class name. Must start uppercase.');
-    var superclass:Token = null;
-    var interfaces:Array<Token> = [];
+    var superclass:Expr.Type = null;
+    var interfaces:Array<Expr.Type> = [];
     var fields:Array<Stmt.Field> = [];
 
     ignoreNewlines();
@@ -369,9 +410,9 @@ class Parser {
       switch previous().type {
         case TokExtends:
           if (superclass != null) throw error(previous(), 'Can only extend once');
-          superclass = consume(TokTypeIdentifier, 'Expect a superclass name');
+          superclass = parseTypePath();
         case TokImplements:
-          interfaces.push(consume(TokTypeIdentifier, 'Expect an interface name'));
+          interfaces.push(parseTypePath());
         default:
       }
       ignoreNewlines();
@@ -692,7 +733,6 @@ class Parser {
         condition = expression();
       }
 
-      // todo: handle '|'
       consume(TokColon, "Expect a ':' after case condition");
       ignoreNewlines();
 
@@ -714,13 +754,53 @@ class Parser {
     }
 
     ignoreNewlines();
-    consume(TokRightBrace, "Expect a '}' at the end of switch statement");
+    consume(TokRightBrace, "Expect a '}' at the end of a switch statement");
     ignoreNewlines();
 
     return new Stmt.Switch(target, cases);
   }
 
-  private function returnStatement():Stmt {
+  function matchExpr():Expr {
+    consume(TokLeftParen, "Expect '(' after 'match'.");
+    ignoreNewlines();
+    var target = expression();
+    ignoreNewlines();
+    consume(TokRightParen, "Expect ')' after match target");
+    ignoreNewlines();
+    consume(TokLeftBrace, "Expect '{'");
+    ignoreNewlines();
+    
+    var cases:Array<Stmt.SwitchCase> = [];    
+
+    while(!isAtEnd() && !check(TokRightBrace)) {
+      ignoreNewlines();
+      
+      var isDefault = false;
+      var condition:Expr = match([ TokDefault ]) ? {
+        isDefault = true;
+        null;
+      } : expression();
+
+      consume(TokArrow, 'Expect a -> after matches');
+      ignoreNewlines();
+      
+      var body = statement();
+
+      cases.push({
+        condition: condition,
+        body: [ body ],
+        isDefault: isDefault
+      });
+    }
+
+    ignoreNewlines();
+    consume(TokRightBrace, "Expect a '}' at the end of a match statement");
+    ignoreNewlines();
+
+    return new Expr.Match(target, cases);
+  }
+
+  function returnStatement():Stmt {
     var keyword = previous();
     var value:Expr = null;
     if (!check(TokSemicolon) && !check(TokNewline)) {
@@ -1102,12 +1182,12 @@ class Parser {
 
     if (match([ TokDollar ])) {
       if (match([ TokLeftBracket ])) {
-        return arrayOrAssocLiteral(true);
+        return arrayOrMapLiteral(true);
       }
     }
 
     if (match([ TokLeftBracket ])) {
-      return arrayOrAssocLiteral();
+      return arrayOrMapLiteral();
     }
 
     if (match([ TokLeftBrace ])) {
@@ -1120,6 +1200,10 @@ class Parser {
 
     if (match([ TokIf ])) {
       return ternary();
+    }
+
+    if (match([ TokMatch ])) {
+      return matchExpr();
     }
 
     var tok = peek();
@@ -1159,19 +1243,29 @@ class Parser {
     return new Expr.Ternary(condition, thenBranch, elseBranch);
   }
 
-  function arrayOrAssocLiteral(isNative:Bool = false):Expr {
+  function arrayOrMapLiteral(isNative:Bool = false):Expr {
     ignoreNewlines();
+    
     if (checkNext(TokColon)) {
       return mapLiteral(isNative);
     }
+
     return arrayLiteral(isNative);
   }
 
   function arrayLiteral(isNative:Bool = false):Expr {
+    var prev = current;
     var values:Array<Expr> = [];
+    
     if (!check(TokRightBracket)) {
       values = parseList(TokComma, expression);
     }
+    
+    if (match([ TokColon ])) {
+      current = prev;
+      return mapLiteral(isNative);
+    }
+
     ignoreNewlines(); // May be one after the last item in the list
     var end = consume(TokRightBracket, "Expect ']' after values.");
     return new Expr.ArrayLiteral(end, values, isNative);
@@ -1274,6 +1368,10 @@ class Parser {
   }
 
   function parseTypePath():Expr.Type {
+    if (match([ TokQuestion ])) {
+      // @todo: mark as nullable
+    }
+
     if (match([ TokDollar ])) {
       var native = consume(TokIdentifier, 'Expect a native PHP scalar identifier');
       return new Expr.Type([ native ], false);
@@ -1284,6 +1382,13 @@ class Parser {
       TokScopeResolutionOperator, 
       () -> consume(TokTypeIdentifier, 'Expect a TypeIdentifier')
     );
+
+    if (match([ TokLess ])) {
+      var params = parseList(TokComma, parseTypePath);
+      // @todo: do something with the params
+      consume(TokGreater, 'Expect a `>` after type params');
+    }
+
     return new Expr.Type(path, absolute);
   }
 

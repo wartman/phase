@@ -149,6 +149,35 @@ _$Sys_FileInput.prototype = $extend(haxe_io_Input.prototype,{
 	}
 	,__class__: _$Sys_FileInput
 });
+var Type = function() { };
+Type.__name__ = true;
+Type.enumEq = function(a,b) {
+	if(a == b) {
+		return true;
+	}
+	try {
+		var e = a.__enum__;
+		if(e == null || e != b.__enum__) {
+			return false;
+		}
+		if(a._hx_index != b._hx_index) {
+			return false;
+		}
+		var enm = $hxEnums[e];
+		var params = enm.__constructs__[a._hx_index].__params__;
+		var _g = 0;
+		while(_g < params.length) {
+			var f = params[_g];
+			++_g;
+			if(!Type.enumEq(a[f],b[f])) {
+				return false;
+			}
+		}
+	} catch( _g ) {
+		return false;
+	}
+	return true;
+};
 var haxe_Exception = function(message,previous,native) {
 	Error.call(this,message);
 	this.message = message;
@@ -216,6 +245,11 @@ var haxe_ds_StringMap = function() {
 	this.h = Object.create(null);
 };
 haxe_ds_StringMap.__name__ = true;
+haxe_ds_StringMap.createCopy = function(h) {
+	var copy = new haxe_ds_StringMap();
+	for (var key in h) copy.h[key] = h[key];
+	return copy;
+};
 haxe_ds_StringMap.prototype = {
 	__class__: haxe_ds_StringMap
 };
@@ -587,6 +621,13 @@ js_node_url_URLSearchParamsEntry.get_name = function(this1) {
 };
 js_node_url_URLSearchParamsEntry.get_value = function(this1) {
 	return this1[1];
+};
+var phase_CodeBuilder = function() { };
+phase_CodeBuilder.__name__ = true;
+phase_CodeBuilder.generate = function(code,pos,reporter) {
+	var scanner = new phase_Scanner(code,pos.file,reporter);
+	var parser = new phase_Parser(scanner.scan(),reporter);
+	return parser.parse();
 };
 var phase_Attribute = function(path,params,relative,expr) {
 	this.path = path;
@@ -1212,7 +1253,7 @@ phase_Parser.prototype = {
 		var fields = [];
 		this.ignoreNewlines();
 		while(this.match(["extends"]) && !this.isAtEnd()) {
-			interfaces.push(this.consume("[type-identifier]","Expect an interface name"));
+			interfaces.push(this.parseTypePath());
 			this.ignoreNewlines();
 		}
 		this.consume("{","Expect '{' before interface body.");
@@ -1241,40 +1282,69 @@ phase_Parser.prototype = {
 		return new phase_Class(name,phase_ClassKind.KindTrait,null,[],fields,attribute);
 	}
 	,enumDeclaration: function(attribute) {
-		var name = this.consume("[type-identifier]","Expect an enum name. Must start uppercase.");
-		var superClass = null;
+		var enumName = this.consume("[type-identifier]","Expect an enum name. Must start uppercase.");
 		var fields = [];
-		this.consume("as","Expected an `as`");
-		superClass = this.consume("[type-identifier]","Expect a wrapped type name");
-		this.consume("{","Expect '{' before trait body.");
+		if(this.match(["as"])) {
+			var superClass = this.consume("[type-identifier]","Expect a wrapped type name");
+			this.consume("{","Expect '{' before enum body.");
+			this.ignoreNewlines();
+			var index = 0;
+			while(!this.check("}") && !this.isAtEnd()) {
+				this.ignoreNewlines();
+				var fieldName = this.consume("[type-identifier]","Expect an uppercase identifier");
+				var value;
+				if(this.match(["="])) {
+					value = this.expression();
+				} else {
+					switch(superClass.lexeme) {
+					case "Int":
+						value = new phase_Literal(index);
+						break;
+					case "String":
+						value = new phase_Literal(fieldName.lexeme);
+						break;
+					default:
+						throw haxe_Exception.thrown(this.error(superClass,"Unknown type -- currently enums may only be Strings or Ints"));
+					}
+				}
+				++index;
+				this.expectEndOfStatement();
+				fields.push(new phase_Field(fieldName,phase_FieldKind.FVar(new phase_Var(fieldName,null,value),null),[phase_FieldAccess.AConst],[]));
+			}
+			this.ignoreNewlines();
+			this.consume("}","Expect '}' at end of enum body");
+			this.ignoreNewlines();
+			return new phase_Class(enumName,phase_ClassKind.KindClass,null,[],fields,attribute);
+		}
+		this.consume("{","Expect '{' before enum body.");
 		this.ignoreNewlines();
 		var index = 0;
 		while(!this.check("}") && !this.isAtEnd()) {
 			this.ignoreNewlines();
-			var fieldName = this.consume("[type-identifier]","Expect an uppercase identifier");
-			var value;
-			if(this.match(["="])) {
-				value = this.expression();
-			} else {
-				switch(superClass.lexeme) {
-				case "Int":
-					value = new phase_Literal(index);
-					break;
-				case "String":
-					value = new phase_Literal(fieldName.lexeme);
-					break;
-				default:
-					throw haxe_Exception.thrown(this.error(superClass,"Unknown type -- currently enums may only be Strings or Ints"));
-				}
+			var name = this.consume("[type-identifier]","Expect an uppercase identifier");
+			var params = [];
+			var ret = new phase_Type([enumName],false);
+			if(!this.match(["[newline]"])) {
+				this.consume("(","Expect '(' after function name.");
+				params = this.functionParams(false);
 			}
-			++index;
+			var body = "{ return " + enumName.lexeme + "(\r\n        " + index++ + ",\r\n        \"" + name.lexeme + "\",\r\n        [ ";
+			var result = new Array(params.length);
+			var _g = 0;
+			var _g1 = params.length;
+			while(_g < _g1) {
+				var i = _g++;
+				result[i] = params[i].name.lexeme;
+			}
+			var body1 = phase_CodeBuilder.generate(body + result.join(", ") + " ]\r\n      ) }",enumName.pos,this.reporter);
+			console.log("src/phase/Parser.hx:375:",body1);
 			this.expectEndOfStatement();
-			fields.push(new phase_Field(fieldName,phase_FieldKind.FVar(new phase_Var(fieldName,null,value),null),[phase_FieldAccess.AConst],[]));
+			fields.push(new phase_Field(name,phase_FieldKind.FFun(new phase_Function(name,params,body1[0],ret,[])),[phase_FieldAccess.APublic,phase_FieldAccess.AStatic],attribute));
 		}
 		this.ignoreNewlines();
-		this.consume("}","Expect '}' at end of trait body");
+		this.consume("}","Expect '}' at end of enum body");
 		this.ignoreNewlines();
-		return new phase_Class(name,phase_ClassKind.KindClass,null,[],fields,attribute);
+		return new phase_Class(enumName,phase_ClassKind.KindClass,new phase_Type([new phase_Token("[type-identifier]","Std","Std",enumName.pos),new phase_Token("[type-identifier]","PhaseEnum","PhaseEnum",enumName.pos)],true),[],fields,attribute);
 	}
 	,classDeclaration: function(attribute) {
 		var name = this.consume("[type-identifier]","Expect a class name. Must start uppercase.");
@@ -1288,10 +1358,10 @@ phase_Parser.prototype = {
 				if(superclass != null) {
 					throw haxe_Exception.thrown(this.error(this.previous(),"Can only extend once"));
 				}
-				superclass = this.consume("[type-identifier]","Expect a superclass name");
+				superclass = this.parseTypePath();
 				break;
 			case "implements":
-				interfaces.push(this.consume("[type-identifier]","Expect an interface name"));
+				interfaces.push(this.parseTypePath());
 				break;
 			default:
 			}
@@ -2146,7 +2216,7 @@ var phase_GeneratorMode = $hxEnums["phase.GeneratorMode"] = { __ename__:true,__c
 phase_GeneratorMode.__constructs__ = [phase_GeneratorMode.GeneratingRoot,phase_GeneratorMode.GeneratingClass,phase_GeneratorMode.GeneratingInterface,phase_GeneratorMode.GeneratingTrait,phase_GeneratorMode.GeneratingClosure,phase_GeneratorMode.GeneratingFunction];
 var phase_PhpGenerator = function(stmts,reporter,options) {
 	this.isCall = false;
-	this.typedExprs = new haxe_ds_ObjectMap();
+	this.context = null;
 	this.append = [];
 	this.uid = 0;
 	this.indentLevel = 0;
@@ -2177,7 +2247,7 @@ phase_PhpGenerator.prototype = {
 		this.append = [];
 		this.scope = new phase_PhpScope();
 		var analysis = new phase_analysis_StaticAnalyzer(this.stmts,this.reporter);
-		this.typedExprs = analysis.analyze();
+		this.context = analysis.analyze();
 		var out = [];
 		var _g = 0;
 		var _g1 = this.stmts;
@@ -2362,7 +2432,7 @@ phase_PhpGenerator.prototype = {
 		out += "\n" + this.getIndent() + keyword + " " + stmt.name.lexeme;
 		this.scope.define(stmt.name.lexeme,phase_PhpKind.PhpType);
 		if(stmt.superclass != null) {
-			out += " extends " + stmt.superclass.lexeme;
+			out += " extends " + this.generateExpr(stmt.superclass);
 		}
 		if(stmt.interfaces.length > 0) {
 			var out1;
@@ -2379,12 +2449,13 @@ phase_PhpGenerator.prototype = {
 			}
 			out += out1;
 			var _this = stmt.interfaces;
+			var f = $bind(this,this.generateExpr);
 			var result = new Array(_this.length);
 			var _g = 0;
 			var _g1 = _this.length;
 			while(_g < _g1) {
 				var i = _g++;
-				result[i] = _this[i].lexeme;
+				result[i] = f(_this[i]);
 			}
 			out += result.join(", ");
 		}
@@ -2750,10 +2821,6 @@ phase_PhpGenerator.prototype = {
 	}
 	,visitAssignExpr: function(expr) {
 		var name = this.safeVar(expr.name);
-		var kind = this.scope.get(name);
-		if(kind != phase_PhpKind.PhpVar) {
-			throw haxe_Exception.thrown(this.error(expr.name,"Invalid assignment"));
-		}
 		return "$" + name + (" = " + this.generateExpr(expr.value));
 	}
 	,visitIsExpr: function(expr) {
@@ -2766,7 +2833,30 @@ phase_PhpGenerator.prototype = {
 	,visitCallExpr: function(expr) {
 		var _gthis = this;
 		this.isCall = true;
-		var callee = js_Boot.getClass(expr.callee) == phase_Type ? "new " + this.generateExpr(expr.callee) : this.generateExpr(expr.callee);
+		var type = this.context.typeOf(expr.callee);
+		var callee;
+		if(type == null) {
+			callee = js_Boot.getClass(expr.callee) == phase_Type ? "new " + this.generateExpr(expr.callee) : this.generateExpr(expr.callee);
+		} else {
+			switch(type._hx_index) {
+			case 2:
+				var kind = type.kind;
+				throw haxe_Exception.thrown(this.error(expr.paren,"" + kind + " is not callable"));
+			case 3:
+				var _g = type.tp;
+				callee = "new " + this.generateExpr(expr.callee);
+				break;
+			case 5:
+				var _g = type.cls;
+				callee = "new " + this.generateExpr(expr.callee);
+				break;
+			case 6:
+				var _g = type.cls;
+				throw haxe_Exception.thrown(this.error(expr.paren,"Cannot call an instance of " + phase_analysis_TypeTools.getTypeName(type)));
+			default:
+				callee = js_Boot.getClass(expr.callee) == phase_Type ? "new " + this.generateExpr(expr.callee) : this.generateExpr(expr.callee);
+			}
+		}
 		this.isCall = false;
 		var tmp = "" + callee + "(";
 		var _this = expr.args;
@@ -2793,7 +2883,7 @@ phase_PhpGenerator.prototype = {
 		return tmp + result.join(", ") + ")";
 	}
 	,visitGetExpr: function(expr) {
-		var objectType = this.typedExprs.h[expr.object.__id__];
+		var objectType = this.context.typeOf(expr.object);
 		if(objectType != null) {
 			if(objectType._hx_index == 6) {
 				if(objectType.cls == phase_analysis_StaticAnalyzer.stringType) {
@@ -3751,6 +3841,26 @@ phase_VisualErrorReporter.prototype = {
 	}
 	,__class__: phase_VisualErrorReporter
 };
+var phase_analysis_Context = function(typedExprs,typedDecls) {
+	this.typedExprs = typedExprs;
+	this.typedDecls = typedDecls;
+};
+phase_analysis_Context.__name__ = true;
+phase_analysis_Context.prototype = {
+	typeOf: function(expr) {
+		return this.typedExprs.h[expr.__id__];
+	}
+	,getType: function(name) {
+		return this.typedDecls.h[name];
+	}
+	,getTypes: function() {
+		return haxe_ds_StringMap.createCopy(this.typedDecls.h);
+	}
+	,unify: function(a,b) {
+		return Type.enumEq(a,b);
+	}
+	,__class__: phase_analysis_Context
+};
 var phase_analysis_Scope = function(parent) {
 	this.children = [];
 	this.values = new haxe_ds_StringMap();
@@ -3760,6 +3870,12 @@ phase_analysis_Scope.__name__ = true;
 phase_analysis_Scope.prototype = {
 	declare: function(name,type) {
 		this.values.h[name] = type;
+	}
+	,isDeclared: function(name) {
+		if(!Object.prototype.hasOwnProperty.call(this.values.h,name) && this.parent != null) {
+			return this.parent.isDeclared(name);
+		}
+		return Object.prototype.hasOwnProperty.call(this.values.h,name);
 	}
 	,resolve: function(name) {
 		if(Object.prototype.hasOwnProperty.call(this.values.h,name)) {
@@ -3797,8 +3913,8 @@ var phase_analysis_Type = $hxEnums["phase.analysis.Type"] = { __ename__:true,__c
 };
 phase_analysis_Type.__constructs__ = [phase_analysis_Type.TUnknown,phase_analysis_Type.TVoid,phase_analysis_Type.TPhpScalar,phase_analysis_Type.TPath,phase_analysis_Type.TFun,phase_analysis_Type.TClass,phase_analysis_Type.TInstance];
 var phase_analysis_StaticAnalyzer = function(stmts,reporter) {
-	this.decls = [];
 	this.imports = new haxe_ds_StringMap();
+	this.typedDecls = new haxe_ds_StringMap();
 	this.typedExprs = new haxe_ds_ObjectMap();
 	this.scope = null;
 	this.stmts = stmts;
@@ -3810,6 +3926,7 @@ phase_analysis_StaticAnalyzer.prototype = {
 		this.scope = new phase_analysis_Scope();
 		this.imports = new haxe_ds_StringMap();
 		this.typedExprs = new haxe_ds_ObjectMap();
+		this.typedDecls = new haxe_ds_StringMap();
 		var _g = 0;
 		var _g1 = this.stmts;
 		while(_g < _g1.length) {
@@ -3817,12 +3934,21 @@ phase_analysis_StaticAnalyzer.prototype = {
 			++_g;
 			stmt.accept(this);
 		}
-		return this.typedExprs;
+		return new phase_analysis_Context(this.typedExprs,this.typedDecls);
 	}
 	,visitNamespaceStmt: function(stmt) {
 		var _gthis = this;
 		var prev = this.scope;
 		this.scope = this.scope.pushChild();
+		var _this = stmt.path;
+		var result = new Array(_this.length);
+		var _g = 0;
+		var _g1 = _this.length;
+		while(_g < _g1) {
+			var i = _g++;
+			result[i] = _this[i].lexeme;
+		}
+		var ns = result;
 		var _g = 0;
 		var _g1 = stmt.decls;
 		while(_g < _g1.length) {
@@ -3831,11 +3957,19 @@ phase_analysis_StaticAnalyzer.prototype = {
 			switch(js_Boot.getClass(decl)) {
 			case phase_Class:
 				var cls = decl;
-				_gthis.scope.declare(cls.name.lexeme,phase_analysis_Type.TClass({ namespace : [], name : cls.name.lexeme, fields : _gthis.extractClassFields(cls)}));
+				var type = phase_analysis_Type.TClass({ namespace : [], name : cls.name.lexeme, fields : _gthis.extractClassFields(cls)});
+				_gthis.scope.declare(cls.name.lexeme,type);
+				var this1 = _gthis.typedDecls;
+				var key = ns.concat([cls.name.lexeme]).join("::");
+				this1.h[key] = type;
 				break;
 			case phase_Function:
 				var fn = decl;
-				_gthis.scope.declare(fn.name.lexeme,phase_analysis_Type.TFun({ name : fn.name.lexeme, args : [], ret : _gthis.typeFromTypeExpr(fn.ret)}));
+				var fun = phase_analysis_Type.TFun({ name : fn.name.lexeme, args : [], ret : _gthis.typeFromTypeExpr(fn.ret)});
+				_gthis.scope.declare(fn.name.lexeme,fun);
+				var this11 = _gthis.typedDecls;
+				var key1 = ns.concat([fn.name.lexeme]).join("::");
+				this11.h[key1] = fun;
 				break;
 			case phase_Var:
 				decl.accept(_gthis);
@@ -4160,6 +4294,9 @@ phase_analysis_StaticAnalyzer.prototype = {
 		this.setType(expr,phase_analysis_Type.TPath({ namespace : [], name : "Map"}));
 	}
 	,visitAssignExpr: function(expr) {
+		if(!this.scope.isDeclared(expr.name.lexeme)) {
+			throw haxe_Exception.thrown(this.error(expr.name,"Invalid assignment"));
+		}
 		this.setType(expr,this.scope.resolve(expr.name.lexeme));
 	}
 	,visitIsExpr: function(expr) {
@@ -4417,6 +4554,31 @@ var phase_analysis_TypeError = function() {
 phase_analysis_TypeError.__name__ = true;
 phase_analysis_TypeError.prototype = {
 	__class__: phase_analysis_TypeError
+};
+var phase_analysis_TypeTools = function() { };
+phase_analysis_TypeTools.__name__ = true;
+phase_analysis_TypeTools.getTypeName = function(type) {
+	switch(type._hx_index) {
+	case 0:
+		return "<unknown>";
+	case 1:
+		return "<void>";
+	case 2:
+		var kind = type.kind;
+		return "<$" + kind + ">";
+	case 3:
+		var tp = type.tp;
+		return tp.namespace.concat([tp.name]).join("::");
+	case 4:
+		var fun = type.fun;
+		return fun.name;
+	case 5:
+		var cls = type.cls;
+		return cls.namespace.concat([cls.name]).join("::");
+	case 6:
+		var cls = type.cls;
+		return cls.namespace.concat([cls.name]).join("::");
+	}
 };
 var sys_FileSystem = function() { };
 sys_FileSystem.__name__ = true;

@@ -1,15 +1,4 @@
 -cp src
 
---each
-
 -main Phase
 -php dist/phase
-
---next
-
--lib hxnodejs
-
-# For use as imports
--D noCmd
-phase.NodeCompiler
--js cjs/index.js

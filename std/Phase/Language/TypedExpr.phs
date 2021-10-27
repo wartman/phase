@@ -1,0 +1,11 @@
+namespace Phase::Language {
+
+  class TypedExpr {
+    new(
+      expr: ExprDef,
+      pos: Position,
+      type: Type
+    ) {}
+  }
+
+}

@@ -1,7 +1,10 @@
 namespace Phase::Language {
 
-  interface Expr {
-    accept(visitor:ExprVisitor);
+  class Expr {
+    new(
+      this.expr: ExprDef,
+      this.pos: Position
+    ) {}
   }
 
 }

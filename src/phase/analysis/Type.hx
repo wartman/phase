@@ -8,6 +8,8 @@ typedef TypePath = {
 typedef ClassType = {
   public final name:String;
   public final namespace:Array<String>;
+  public final superclass:Null<Type>;
+  public final interfaces:Array<Type>;
   public final fields:Array<Field>;
 }
 

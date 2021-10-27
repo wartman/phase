@@ -1,0 +1,10 @@
+namespace Phase::Language {
+
+  enum ClassKind as String {
+    KindClass
+    KindInterface
+    KindTrait
+    KindEnum
+  }
+
+}

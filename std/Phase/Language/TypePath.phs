@@ -1,0 +1,11 @@
+namespace Phase::Language {
+
+  class TypePath {
+    new(
+      this.ns: Array<String>,
+      this.name: String,
+      this.params: Array<TypePath>
+    ) {}
+  }
+
+}

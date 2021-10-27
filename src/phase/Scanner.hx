@@ -39,6 +39,7 @@ class Scanner {
     TokTry => TokTry,
     TokCatch => TokCatch,
     TokSwitch => TokSwitch,
+    TokMatch => TokMatch,
     TokCase => TokCase,
     TokDefault => TokDefault
   ];
@@ -85,7 +86,14 @@ class Scanner {
       case '&': addToken(match('&') ? TokBoolAnd : TokAnd);
       case ',': addToken(TokComma);
       case '.': addToken(match('.') ? TokRange : TokDot);
-      case '-': addToken(match('-') ? TokMinusMinus : TokMinus);
+      case '-': 
+        addToken(
+          match('>') 
+            ? TokArrow
+            : match('-') 
+              ? TokMinusMinus 
+              : TokMinus
+        );
       case '+': 
         if (match('=')) {
           addToken(TokPlusEqual);
@@ -101,16 +109,17 @@ class Scanner {
       case '#': addToken(TokSharp);
       case '$': addToken(TokDollar);
       case '!': addToken(match('=') ? TokBangEqual : TokBang);
+      case '?': addToken(TokQuestion);
       case '=': addToken(match('=') ? TokBoolEqual : TokEqual);
       case '<': addToken(match('=') ? TokLessEqual : TokLess);
       case '>': addToken(match('=') ? TokGreaterEqual : TokGreater);
       case '/' if (match('/')):
         // Comment
         while (peek() != '\n' && !isAtEnd()) advance();
-        if (peek() == '\n') {
-          line++;
-          advance(); // Consume the newline too.
-        }
+        // if (peek() == '\n') {
+        //   line++;
+        //   advance(); // Consume the newline too.
+        // }
       case '/': addToken(TokSlash);
       case '"': string();
       case "'": string("'");

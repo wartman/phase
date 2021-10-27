@@ -138,14 +138,13 @@ enum ClassKind {
   KindClass;
   KindInterface;
   KindTrait;
-  // KindEnum;
 }
 
 class Class implements Stmt {
   var name:Token;
   var kind:ClassKind;
-  var superclass:Token;
-  var interfaces:Array<Token>;
+  var superclass:Expr.Type;
+  var interfaces:Array<Expr.Type>;
   var fields:Array<Field>;
   var attribute:Array<Expr>;
 }

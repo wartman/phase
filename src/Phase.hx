@@ -5,8 +5,8 @@ using haxe.io.Path;
 @:allow(phase)
 class Phase {
 
-  public static final corePaths:Map<String, String> = [
-    'Phase' => Path.join([ Sys.programPath(), '../std' ]).normalize()
+  public static final corePaths:Array<String> = [
+    Path.join([ Sys.programPath().directory().directory().directory(), 'std' ]).normalize()
   ];
 
   public static function main() {
@@ -25,6 +25,7 @@ class Phase {
     var compiler = new Compiler(
       src,
       dist,
+      corePaths,
       source -> new VisualErrorReporter(source),
       onComplete
     );

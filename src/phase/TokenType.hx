@@ -29,6 +29,7 @@ enum abstract TokenType(String) to String {
   var TokBoolOr = '||';
   var TokScopeResolutionOperator = '::';
   var TokBang = '!';
+  var TokQuestion = '?';
   var TokBangEqual = '!=';
   var TokEqual = '=';
   var TokBoolEqual = '==';
@@ -39,6 +40,7 @@ enum abstract TokenType(String) to String {
   var TokRange = '...';
   var TokConcat = '+++';
   var TokPipe = '|>';
+  var TokArrow = '->';
 
   var TokClass = 'class';
   var TokInterface = 'interface';
@@ -72,6 +74,7 @@ enum abstract TokenType(String) to String {
   var TokTry = 'try';
   var TokCatch = 'catch';
   var TokSwitch = 'switch';
+  var TokMatch = 'match';
   var TokCase = 'case';
   var TokDefault = 'default';
   var TokGlobal = 'global';

@@ -1,0 +1,84 @@
+namespace Phase::Language {
+
+  enum ExprDef {
+    EAttribute(
+      path: TypePath,
+      args: Array<CallArgument>
+    )
+    EAssign(
+      name: String,
+      value: Expr
+    )
+    EBinary(
+      left: Expr,
+      op: String,
+      right: Expr
+    )
+    EUnary(
+      op: String,
+      expr: Expr,
+      isRight: Bool
+    )
+    EIs(
+      left: Expr,
+      type: TypePath
+    )
+    ELogical(
+      left: Expr,
+      op: String,
+      right: Expr
+    )
+    ERange(
+      from: Expr,
+      to: Expr
+    )
+    ECall(
+      callee: Expr,
+      args: Array<CallArgument>
+    )
+    EGet(
+      target: Expr,
+      field: Expr
+    )
+    ESet(
+      target: Expr,
+      field: Expr,
+      value: Expr
+    )
+    EArrayGet(
+      target: Expr,
+      field: ?Expr 
+    )
+    EArraySet(
+      target: Expr,
+      field: ?Expr,
+      value: Expr 
+    )
+    ETernary(
+      condition: Expr,
+      thenBranch: Expr,
+      elseBranch: Expr
+    )
+    ESuper(method: String)
+    EThis()
+    EStatic()
+    EGrouping(expr: Expr)
+    ELiteral(value: Any)
+    EArrayLiteral(
+      values: Array<Expr>,
+      isNative: Bool
+    )
+    EMapLiteral(
+      keys: Array<Expr>,
+      values: Array<Expr>,
+      isNative: Bool
+    )
+    ELambda(func: Stmt)
+    EVariable(name: String)
+    EMatch(
+      target: Expr,
+      cases: Array<MatchCase>
+    )
+  }
+
+}

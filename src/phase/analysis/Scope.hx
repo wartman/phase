@@ -2,8 +2,8 @@ package phase.analysis;
 
 class Scope {
   public final values:Map<String, Type> = new Map();
-  final parent:Null<Scope>;
-  final children:Array<Scope> = [];
+  public final parent:Null<Scope>;
+  public final children:Array<Scope> = [];
 
   public function new(?parent) {
     this.parent = parent;
@@ -11,6 +11,13 @@ class Scope {
 
   public function declare(name:String, type:Type) {
     values.set(name, type);
+  }
+
+  public function isDeclared(name:String) {
+    if (!values.exists(name) && parent != null) { 
+      return parent.isDeclared(name);
+    }
+    return values.exists(name);
   }
 
   public function resolve(name:String):Type {

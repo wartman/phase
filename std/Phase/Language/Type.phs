@@ -1,0 +1,28 @@
+namespace Phase::Language {
+
+  /// Represents a type.
+  enum Type {
+    /// A nullable type
+    TNullable(type: Type)
+
+    /// Nothing
+    TVoid()
+
+    /// A dynamic type.
+    TAny()
+
+    /// A type that is currently unknown, but which may
+    /// be resolvable.
+    TUnknown(path: ?TypePath)
+
+    /// A function type.
+    TFun(func: FunctionDecl)
+
+    /// A class.
+    TClass(cls: ClassDecl)
+
+    /// An instance of a class.
+    TInstance(cls: ClassDecl)
+  }
+
+}

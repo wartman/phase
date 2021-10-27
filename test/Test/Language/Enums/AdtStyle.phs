@@ -1,0 +1,17 @@
+namespace Test::Language::Enums {
+
+  enum FooEnum {
+    Bar(bar: String)
+    Bin(bin: String)
+    Bax
+  }
+
+  var foo: FooEnum = FooEnum.Bar('bin')
+  ::Expect.that(foo.params[0], 'bin')
+
+  match (foo) {
+    Bin('bin') -> null
+    Bar(bar) -> ::Expect.that(bar, 'bin')
+    default -> null
+  }
+}

@@ -1,0 +1,11 @@
+namespace Phase::Language {
+
+  enum FieldAccess as String {
+    AStatic
+    APublic
+    APrivate
+    AAbstract
+    AConst
+  }
+
+}
