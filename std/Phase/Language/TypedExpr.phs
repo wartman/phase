@@ -2,9 +2,9 @@ namespace Phase::Language {
 
   class TypedExpr {
     new(
-      expr: ExprDef,
-      pos: Position,
-      type: Type
+      this.expr: ExprDef,
+      this.pos: Position,
+      this.type: Type
     ) {}
   }
 

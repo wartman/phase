@@ -2,9 +2,9 @@ namespace Phase::Language {
 
   class TypedStmt {
     new(
-      stmt: StmtDef,
-      pos: Position,
-      type: Type
+      this.stmt: StmtDef,
+      this.pos: Position,
+      this.type: Type
     ) {}
   }
 
