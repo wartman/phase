@@ -4,7 +4,8 @@ namespace Phase::Language {
     new(
       this.ns: Array<String>,
       this.name: String,
-      this.params: Array<TypePath>
+      this.params: Array<TypePath>,
+      this.isAbsolute: Bool = false
     ) {}
   }
 

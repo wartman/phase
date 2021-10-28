@@ -2,7 +2,7 @@ namespace Phase::Language {
 
   class Token {
     new(
-      this.type: TokenType,
+      this.type: String, // Todo
       this.lexeme: String,
       this.literal: String = null,
       this.pos: Position

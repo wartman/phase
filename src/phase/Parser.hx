@@ -73,6 +73,7 @@ class Parser {
   function statement():Stmt {
     if (match([ TokIf ])) return ifStatement();
     if (match([ TokWhile ])) return whileStatement();
+    if (match([ TokDo ])) return doStatement();
     if (match([ TokFor ])) return forStatement();
     if (match([ TokSwitch ])) return switchStatement();
     if (match([ TokReturn ])) return returnStatement();
@@ -686,13 +687,25 @@ class Parser {
     return new Stmt.If(condition, thenBranch, elseBranch);
   }
 
+  function doStatement():Stmt {
+    var body = statement();
+    consume(TokWhile, "Expect 'while' after a 'do' statment.");
+    consume(TokLeftParen, "Expect '(' after 'while'.");
+    var condition = expression();
+    consume(TokRightParen, "Expect ')' after 'while' condition.");
+    
+    expectEndOfStatement();
+
+    return new Stmt.While(condition, body, true);
+  }
+
   function whileStatement():Stmt {
     consume(TokLeftParen, "Expect '(' after 'while'.");
     var condition = expression();
     consume(TokRightParen, "Expect ')' after 'while' condition.");
     var body = statement();
 
-    return new Stmt.While(condition, body);
+    return new Stmt.While(condition, body, false);
   }
 
   function forStatement():Stmt {
@@ -795,7 +808,6 @@ class Parser {
 
     ignoreNewlines();
     consume(TokRightBrace, "Expect a '}' at the end of a match statement");
-    ignoreNewlines();
 
     return new Expr.Match(target, cases);
   }
@@ -1294,7 +1306,7 @@ class Parser {
   function shortLambda(isInline:Bool = false) {
     ignoreNewlines();
     var params:Array<Stmt.FunctionArg> = [];
-    var maybeNeedIt:Bool = false;
+    // var maybeNeedIt:Bool = false;
     if (match([ TokBar ])) {
       if (!check(TokBar)) {
         do {

@@ -62,6 +62,7 @@ class Try implements Stmt {
 class While implements Stmt {
   var condition:Expr;
   var body:Stmt;
+  var inverted:Bool;
 }
 
 class For implements Stmt {

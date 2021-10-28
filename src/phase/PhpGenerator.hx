@@ -417,6 +417,10 @@ class PhpGenerator
   }
 
   public function visitWhileStmt(stmt:Stmt.While):String {
+    if (stmt.inverted) {
+      return getIndent() + 'do\n' + generateStmt(stmt.body) 
+        + '\n' + getIndent() + 'while (' + generateExpr(stmt.condition) + ');';
+    }
     return getIndent() + 'while (' + generateExpr(stmt.condition) + ')\n' 
       + generateStmt(stmt.body);
   }
@@ -478,8 +482,9 @@ class PhpGenerator
 
   public function visitMatchExpr(expr:Expr.Match):String {
     var type = typeOf(expr.target);
+
     switch type {
-      case TInstance(cls): 
+      case TInstance(cls) | TClass(cls): // temp 
         var superclass = findType(cls.superclass);
         switch superclass {
           case TClass({ 
@@ -502,6 +507,7 @@ class PhpGenerator
     var temp = tempVar('matcher');
     var out = "$" + temp + ' = ' + generateExpr(expr.target) + ';\n';
     var body:Array<String> = [];
+    var def:String = '';
     // var handled:Array<String> = [];
     // var hasDefault = false;
 
@@ -509,7 +515,13 @@ class PhpGenerator
     scope.define(temp, PhpVar);
 
     for (c in expr.cases) {
-      switch Std.downcast(c.condition, Expr.Call) {
+      if (c.isDefault) {
+        def = '\n' + getIndent() + 'else {\n'; 
+        indent();
+        def += c.body.map(generateStmt).join('\n');
+        outdent();
+        def += '\n' + getIndent() + '}';
+      } else switch Std.downcast(c.condition, Expr.Call) {
         case null:
         case matcher:
           var name = generateExpr(matcher.callee);
@@ -548,9 +560,9 @@ class PhpGenerator
             var code = 'if (${ checks.join(' && ') }) { \n';
             
             code += extracts.length > 0 
-              ? extracts.join('') + '\n'
+              ? extracts.join('\n') + '\n'
               : '';
-            code += c.body.map(generateStmt).join('');
+            code += c.body.map(generateStmt).join('\n');
 
             outdent();
             
@@ -565,7 +577,9 @@ class PhpGenerator
 
     scope.pop();
 
-    return out + getIndent() + body.join(getIndent() + 'else ');
+    return out + getIndent() 
+      + body.join('\n' + getIndent() + 'else ')
+      + def;
   }
 
   public function visitAttributeExpr(expr:Expr.Attribute):String {
@@ -1008,8 +1022,7 @@ class PhpGenerator
 
   function typeOf(expr:Expr) {
     return switch context.typeOf(expr) {
-      case TPath(tp): 
-        trace(tp);
+      case TPath(tp):
         server.locateType(tp.namespace.concat([ tp.name ]).join('::'));
       case other: 
         other;

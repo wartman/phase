@@ -16,8 +16,6 @@ class CodeBuilder {
       throw new GeneratorError();
     }
     var expr = stmts[0];
-    trace(code);
-    trace(expr);
     return switch Std.downcast(expr, Stmt.Expression) {
       case null:
         reporter.report(pos, '<generated>', 'Expected a single expression');

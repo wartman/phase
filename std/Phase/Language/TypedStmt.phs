@@ -1,0 +1,11 @@
+namespace Phase::Language {
+
+  class TypedStmt {
+    new(
+      stmt: StmtDef,
+      pos: Position,
+      type: Type
+    ) {}
+  }
+
+}

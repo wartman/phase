@@ -24,3 +24,9 @@ foreach (listDir(__DIR__ . '/dist/test/Test/Language') as $folder) {
     echo '  PASSED' . PHP_EOL;
   }
 }
+
+foreach (listDir(__DIR__ . '/dist/test/Test/Phase') as $file) {
+    echo 'Running test: Test::Phase::' . $file . PHP_EOL;
+    include __DIR__ . '/dist/test/Test/Phase/' . $file;
+    echo '  PASSED' . PHP_EOL;
+}

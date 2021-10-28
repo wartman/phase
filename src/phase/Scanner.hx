@@ -30,6 +30,7 @@ class Scanner {
     TokVar => TokVar,
     TokGlobal => TokGlobal,
     TokWhile => TokWhile,
+    TokDo => TokDo,
     TokUse => TokUse,
     TokNamespace => TokNamespace,
     TokAs => TokAs,

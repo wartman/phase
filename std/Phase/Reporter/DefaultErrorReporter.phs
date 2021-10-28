@@ -1,0 +1,15 @@
+namespace Phase::Reporter {
+
+  use Phase::ErrorReporter
+  use Phase::Language::Position
+
+  class DefaultErrorReporter implements ErrorReporter {
+    new() {}
+    
+    report(pos: Position, message: String) {
+      // todo: implement this
+      print(message)
+    }
+  }
+
+}

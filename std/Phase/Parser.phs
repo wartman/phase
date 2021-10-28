@@ -1,19 +1,796 @@
 namespace Phase {
 
+  use Phase::Language::{
+    Token,
+    TokenType,
+    Position,
+    Expr,
+    ExprDef,
+    Stmt,
+    StmtDef,
+    TypePath,
+    CallArgument,
+    FunctionArg,
+    FunctionDecl
+    // ... and more
+  }
+
   class Parser {
-    private tokens: Array
-    private statements: Array = []
+    static continuationTokens: Array<String> = [
+      TokenType.TokDot,
+      TokenType.TokPlus,
+      TokenType.TokConcat,
+      TokenType.TokPipe,
+      TokenType.TokMinus,
+      TokenType.TokBoolEqual,
+      TokenType.TokBangEqual,
+      TokenType.TokBoolAnd,
+      TokenType.TokBoolOr
+    ]
+
+    private tokens: Array<Token>
     private reporter: ErrorReporter
+    private current: Int
+    private uid: Int = 0
 
     new(
-      this.tokens: Array,
+      this.tokens: Array<Token>,
       this.reporter: ErrorReporter
     ) {}
 
-    parse(): Array {
-      this.statements = []
+    parse(): Array<Stmt> {
+      var statements = []
+      
+      this.current = 0
 
-      return this.statements
+      this.ignoreNewlines()
+      while (!this.isAtEnd()) {
+        var stmt: Stmt = this.declaration()
+        if (stmt != null) statements.push(stmt)
+      }
+
+      return statements
+    }
+
+    declaration(attributes: ?Array<Expr> = null): Stmt {
+      if (attributes == null) {
+        attributes = []
+      }
+      if (this.matches([ TokenType.TokLeftBracket ])) {
+        return this.declaration(this.attributeList())
+      }
+      if (this.matches([ TokenType.TokVar ])) {
+        if (attributes.length > 0) {
+          throw this.error(this.previous(), 'Attributes are not allowed here')
+        }
+        return this.varDeclaration()
+      }
+    }
+
+    statement() {
+
+    }
+
+    private varDeclaration() {
+      var start = this.previous()
+      var name: Token = this.consume(TokenType.TokIdentifier, "Expect a variable name")
+      var type: TypePath = null
+      var init: Expr = null
+
+      if (this.matches([ TokenType.TokColon ])) {
+        type = this.parseTypePath()
+      }
+      if (this.matches([ TokenType.TokEqual ])) {
+        init = this.expression()
+      }
+
+      this.expectEndOfStatement()
+
+      return Stmt(
+        stmt: StmtDef.SVar(
+          name: name.lexeme,
+          typeHint: type,
+          initializer: init
+        ),
+        pos: start.pos.merge(this.previous().pos)
+      )
+    }
+
+    private attributeList(): Array<Expr> {
+      var attributes: Array<Expr> = []
+      var start = this.previous()
+
+      do {
+        var path: TypePath = this.parseList(TokenType.TokScopeResolutionOperator) {
+          return this.consume(TokenType.TokTypeIdentifier, "Expect a package name seperated by '::'")
+        }
+        var args: Array<CallArgument> = []
+        if (this.matches([ TokenType.TokLeftParen ])) {
+          if (!this.matches([ TokenType.TokRightParen ])) {
+            args = this.parseArguments()
+          }
+          this.ignoreNewlines()
+          this.consume(TokenType.TokRightParen, "Expect ')' at the end of an attribute")
+        }
+        this.ignoreNewlines()
+        attributes.push(Expr(
+          expr: ExprDef.EAttribute(
+            path: path,
+            args: args
+          ),
+          pos: start.pos.merge(this.previous().pos)
+        ))
+      } while (this.matches([ TokenType.TokComma ]))
+      
+      this.consume(TokenType.TokRightBracket, "Expect a ']' at the end of an attribute")
+      this.ignoreNewlines()
+      
+      if (this.matches([ TokenType.TokLeftBracket ])) {
+        attributes = attributes.concat(attributeList())
+      }
+
+      return attributes
+    }
+    
+    private matchExpr(): Expr {
+      // todo
+    }
+
+    private expression(): Expr {
+      return this.assignment()
+    }
+
+    private assignment(): Expr {
+      var expr: Expr = this.or()
+      
+      if (this.matches([ TokenType.TokEqual ])) {
+        // Todo: how do we handle TokPlusEqual?
+
+        this.ignoreNewlines()
+        var value: Expr = this.assignment()
+        var def: ExprDef = expr.expr
+
+        match (def) {
+          EVariable(name) -> return Expr(
+            expr: ExprDef.EAssign(name, value),
+            pos: expr.pos.merge(value.pos)
+          )
+          EGet(target, field) -> return Expr(
+            expr: ExprDef.ESet(target, field, value),
+            pos: expr.pos.merge(value.pos)
+          )
+          EArrayGet(target, field) -> return Expr(
+            expr: ExprDef.EArraySet(target, field, value),
+            pos: expr.pos.merge(value.pos)
+          )
+          default -> throw error(this.previous(), "Invalid assignment target")
+        }
+      }
+
+      return expr
+    }
+
+    private or(): Expr {
+      var expr: Expr = this.and()
+
+      while (this.matches([ TokenType.TokBoolOr ])) {
+        var op: Token = this.previous()
+        this.ignoreNewlines();
+        var right: Expr = this.and()
+
+        expr = Expr(
+          expr: ExprDef.ELogical(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private and(): Expr {
+      var expr: Expr = this.equality()
+
+      while (this.matches([ TokenType.TokBoolAnd ])) {
+        var op: Token = this.previous()
+        this.ignoreNewlines()
+        var right: Expr = this.equality()
+
+        expr = Expr(
+          expr: ExprDef.ELogical(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private equality(): Expr {
+      var expr: Expr = this.comparison()
+
+      while (this.matches([ TokenType.TokBangEqual, TokenType.TokBoolEqual ])) {
+        var op: Token = this.previous()
+        this.ignoreNewlines()
+        var right: Expr = this.comparison()
+        
+        expr = Expr(
+          expr: ExprDef.EBinary(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private comparison(): Expr {
+      var expr: Expr = this.addition()
+
+      if (this.matches([ TokenType.TokIs ])) {
+        var type = this.parseTypePath()
+        var pos = expr.pos.merge(this.previous().pos)
+
+        this.ignoreNewlines()
+        
+        return Expr(
+          expr: ExprDef.EIs(expr, type),
+          pos: pos
+        )
+      }
+
+      while(this.matches([
+        TokenType.TokGreater,
+        TokenType.TokGreaterEqual,
+        TokenType.TokLess,
+        TokenType.TokLessEqual
+      ])) {
+        var op = this.previous()
+        this.ignoreNewlines()
+        var right = this.addition()
+        expr = Expr(
+          expr: ExprDef.EBinary(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private addition(): Expr {
+      var expr: Expr = this.multiplication()
+
+      while (this.matches([
+        TokenType.TokMinus,
+        TokenType.TokPlus
+      ])) {
+        var op: Token = this.previous()
+        this.ignoreNewlines()
+        var right: Expr = this.multiplication()
+        expr = Expr(
+          expr: ExprDef.EBinary(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private multiplication(): Expr {
+      var expr: Expr = this.range()
+
+      while (this.matches([
+        TokenType.TokSlash,
+        TokenType.TokStar
+      ])) {
+        var op: Token = this.previous()
+        this.ignoreNewlines()
+        var right: Expr = this.range()
+        expr = Expr(
+          expr: ExprDef.EBinary(expr, op.lexeme, right),
+          pos: expr.pos.merge(right.pos)
+        )
+      }
+
+      return expr
+    }
+    
+    private range(): Expr {
+      var expr: Expr = this.pipe()
+
+      while (this.matches([ TokenType.TokRange ])) {
+        this.ignoreNewlines()
+        var to: Expr = this.pipe()
+        expr = Expr(
+          expr: ExprDef.ERange(expr, to),
+          pos: expr.pos.merge(to.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private pipe(): Expr {
+      var expr = this.unary()
+
+      while (this.matches([ TokenType.TokPipe ])) {
+        var op = this.previous()
+        var target: Expr = this.unary()
+        var def: ExprDef = target.expr
+
+        match(def) {
+          ECall(callee, args) -> {
+            expr = Expr(
+              expr: ExprDef.ECall(callee, args.concat([
+                CallArgument.Positional(expr)
+              ])),
+              pos: target.pos
+            )
+          }
+          ELambda(func) -> {
+            expr = Expr(
+              expr: ExprDef.ECall(
+                Expr(expr: ExprDef.EGrouping(target), pos: target.pos),
+                [ CallArgument.Positional(expr) ]
+              ),
+              pos: target.pos
+            )
+          }
+          default -> throw error(op, 'Expected a function/method call or a lambda')
+        }
+      }
+
+      return expr
+    }
+
+    private unary(): Expr {
+      if (this.matches([
+        TokenType.TokBang,
+        TokenType.TokMinus,
+        TokenType.TokPlusPlus,
+        TokenType.TokMinusMinus
+      ])) {
+        var op = this.previous()
+        this.ignoreNewlines()
+        var target = this.unary()
+        return Expr(
+          expr: ExprDef.EUnary(op.lexeme, target, true),
+          pos: op.pos.merge(target.pos)
+        )
+      }
+
+      var expr = this.call()
+
+      if (this.matches([
+        TokenType.TokPlusPlus,
+        TokenType.TokMinusMinus
+      ])) {
+        var op = this.previous()
+        return Expr(
+          expr: ExprDef.EUnary(op.lexeme, expr, false),
+          pos: expr.pos.merge(op.pos)
+        )
+      }
+
+      return expr
+    }
+
+    private call(): Expr {
+      var expr: Expr = this.primary()
+
+      while (!this.isAtEnd()) {
+        this.conditionalIgnoreNewlines()
+
+        if (this.matches([ TokenType.TokLeftParen ])) {
+          expr = this.finishCall(expr)
+        } else if (this.matches([ TokenType.TokLeftBrace ])) {
+          var arg = this.shortLambda(!this.check(TokenType.TokNewline))
+          expr = Expr(
+            expr: ExprDef.ECall(
+              expr,
+              [ CallArgument.Positional(arg) ]
+            ),
+            pos: expr.pos.merge(arg.pos)
+          )
+        } else if (this.matches([ TokenType.TokDot ])) {
+          this.ignoreNewlines()
+          var name: Expr = null
+          if (this.matches([ TokenType.TokLeftBrace ])) {
+            this.ignoreNewlines()
+            var ret: Expr = this.expression()
+            var def: ExprDef = ret.expr
+            
+            match (def) {
+              EVariable(_) -> {
+                ret = ExprDef.Expr(
+                  expr: EGrouping(ret),
+                  pos: ret.pos 
+                )
+              }
+              default -> null
+            }
+
+            this.ignoreNewlines()
+            this.consume(TokenType.TokRightBrace, "Expect a '}'")
+            name = ret
+          } else if (this.matches([ TokenType.TokTypeIdentifier, TokenType.TokClass ])) {
+            name = Expr(
+              expr: ExprDef.EVariable(this.previous().lexeme),
+              pos: this.previous().pos
+            )
+          } else {
+            var tok = this.consume(TokenType.TokIdentifier, "Expect property name after '.'.")
+            name = Expr(
+              expr: ExprDef.EVariable(tok.lexeme),
+              pos: tok.pos
+            )
+          }
+          expr = Expr(
+            expr: ExprDef.EGet(expr, name),
+            pos: expr.pos.merge(name.pos)
+          )
+        } else if (this.matches([ TokenType.TokLeftBracket ])) {
+          if (this.matches([ TokenType.TokRightBracket ])) {
+            expr = Expr(
+              expr: ExprDef.EArrayGet(expr, null),
+              pos: expr.pos.merge(this.previous().pos)
+            )
+          } else {
+            this.ignoreNewlines()
+            var index = this.expression()
+            var tok = this.consume(TokRightBracket, "Expect ']' after expression")
+            expr = Expr(
+              expr: ExprDef.EArrayGet(expr, index),
+              pos: expr.pos.merge(tok.pos)
+            )
+          }
+        } else {
+          break
+        }
+      }
+
+      return expr
+    }
+
+    private ternary(): Expr {
+      var start = this.previous()
+      this.consume(TokenType.TokLeftParen, "Expect '(' after 'if'.")
+      var condition: Expr = this.expression()
+      this.consume(TokenType.TokRightParen, "Expect ')' after if condition.")
+      this.ignoreNewlines()
+      var thenBranch = this.expression()
+      this.ignoreNewlines()
+      this.consume(TokenType.TokElse, "Expected an 'else' branch")
+      this.ignoreNewlines()
+      var elseBranch = this.expression()
+      return Expr(
+        expr: ExprDef.ETernary(condition, thenBranch, elseBranch),
+        pos: start.pos.merge(this.previous.pos())
+      )
+    }
+
+    private arrayOrMapLiteral(isNative: Bool = false): Expr {
+      // todo
+    }
+
+    private arrayLiteral(isNative: Bool): Expr {
+      // todo
+    }
+
+    private mapLiteral(isNative: Bool): Expr {
+      // todo
+    }
+
+    private taggedTemplate(callee: Expr): Expr {
+      // todo
+    }
+
+    private interpolation(callee: Expr): Expr {
+      while (!this.isAtEnd()) {
+        var next: Expr = null
+        if (this.matches([ TokenType.TokString ])) {
+          // todo
+        }
+      }
+    }
+
+    private primary(): Expr {
+      if (this.matches([ TokenType.TokFalse ])) {
+        return Expr(
+          expr: ExprDef.ELiteral(false),
+          pos: this.previous().pos
+        )
+      }
+      if (this.matches([ TokenType.TokTrue ])) {
+        return Expr(
+          expr: ExprDef.ELiteral(true),
+          pos: this.previous().pos
+        )
+      }
+      if (this.matches([ TokenType.TokNull ])) {
+        return Expr(
+          expr: ExprDef.ELiteral(null),
+          pos: this.previous().pos
+        )
+      }
+      if (this.matches([ TokenType.TokNumber, TokenType.TokString ])) {
+        var literal = this.previous()
+        return Expr(
+          expr: ExprDef.ELiteral(literal.literal),
+          pos: literal.pos
+        )
+      }
+      if (this.matches([ TokenType.TokInterpolation ])) {
+        var literal = this.previous()
+        return this.interpolation(Expr(
+          expr: ExprDef.ELiteral(literal.literal),
+          pos: literal.pos
+        ))
+      }
+      if (this.matches([ TokenType.TokSuper ])) {
+        var keyword = this.previous()
+        this.consume(TokenType.TokDot, "Expect '.' after 'super'.")
+        this.ignoreNewlines()
+        var method = this.consume(TokenType.TokIdentifier, "Expect superclass method name.")
+        return Expr(
+          expr: ExprDef.ESuper(method.lexeme),
+          pos: keyword.pos.merge(method.pos)
+        )
+      }
+      if (this.matches([ TokenType.TokThis ])) {
+        var keyword = this.previous()
+        return Expr(
+          expr: ExprDef.EThis(),
+          pos: keyword.pos
+        )
+      }
+      if (this.matches([ TokenType.TokStatic ])) {
+        var keyword = this.previous()
+        return Expr(
+          expr: ExprDef.EStatic(),
+          pos: keyword.pos
+        )
+      }
+      // if (match([ TokScopeResolutionOperator ])) {
+      //   return namespacedExprOrType(true);
+      // }
+
+      // if (check(TokTypeIdentifier)) {
+      //   return namespacedExprOrType(false);
+      // }
+      if (this.matches([ TokenType.TokIdentifier ])) {
+        var variable = this.previous()
+        return Expr(
+          expr: ExprDef.EVariable(variable.lexeme),
+          pos: variable.pos
+        )
+      }
+      if (this.matches([ TokenType.TokTemplateTag ])) {
+        var variable = this.previous()
+        return this.taggedTemplate(Expr(
+          expr: ExprDef.EVariable(variable.lexeme),
+          pos: variable.pos
+        ))
+      }
+      if (this.matches([ TokenType.TokLeftParen ])) {
+        var start: Token = this.previous()
+        this.ignoreNewlines()
+        var expr = this.expression()
+        this.ignoreNewlines()
+        var end = this.consume(TokenType.TokRightParen, "Expect ')' after expression.")
+        return Expr(
+          expr: ExprDef.EGrouping(expr),
+          pos: start.pos.merge(end.pos)
+        )
+      }
+      // if (match([ TokDollar ])) {
+      //   if (match([ TokLeftBracket ])) {
+      //     return arrayOrMapLiteral(true);
+      //   }
+      // }
+      if (this.matches([ TokenType.TokLeftBracket ])) {
+        return this.arrayOrMapLiteral()
+      }
+
+      if (this.matches([ TokenType.TokLeftBrace ])) {
+        return this.shortLambda(!this.check(TokenType.TokNewline))
+      }
+
+      if (this.matches([ TokenType.TokFunction ])) {
+        var start = this.previous()
+        return Expr(
+          expr: ExprDef.ELambda(functionDef(true)),
+          pos: start.pos.merge(this.previous().pos)
+        )
+      }
+
+      if (this.matches([ TokenType.TokIf ])) {
+        return this.ternary()
+      }
+
+      if (this.matches([ TokenType.TokMatch ])) {
+        return this.matchExpr()
+      }
+
+      var tok = this.peek()
+      throw this.error(tok, 'Unexpected ${tok.type}')
+    }
+
+    private shortLambda(isInline: Bool = false): Expr {
+      this.ignoreNewlines()
+      
+      var start: Token = this.previous()
+      var args: Array<FunctionArg> = []
+      var body: Array<Stmt> = []
+
+      if (this.matches([ TokenType.TokBar ])) {
+        if (!this.check(TokenType.TokBar)) {
+          do {
+            var name = this.consume(TokenType.TokIdentifier, "Expect an argument name")
+            args.push(FunctionArg(
+              name: name.lexeme,
+              typeHint: null,
+              expr: null
+            ))
+          } while (this.matches([ TokenType.TokComma ]))
+        }
+        this.consume(TokenType.TokBar, "Expect '|' after lambda arguments")
+        isInline = !this.check(TokenType.TokNewline)
+      } else {
+        args = [
+          FunctionArg(
+            name: 'it',
+            type: null,
+            expr: Expr(
+              expr: ELiteral(null),
+              pos: previous().pos
+            )
+          )
+        ]
+      }
+      
+      if (isInline && !this.check(TokenType.TokReturn)) {
+        // Treat the next statement as a return
+        var expr = this.expression()
+        body.push(Stmt(
+          stmt: StmtDef.SReturn(expr),
+          pos: expr.pos
+        ))
+        this.ignoreNewlines()
+        this.consume(TokenType.TokRightBrace, 'Inline lambdas must contain only one expression.')
+      } else {
+        body = this.block()
+      }
+      
+      return Expr(
+        expr: ExprDef.ELambda(FunctionDecl(
+          name: '',
+          args: args,
+          body: Stmt(
+            stmt: StmtDef.SBlock(body),
+            pos: if (body.length > 0)
+              body[0].pos.merge(this.previous().pos)
+            else
+              start.pos.merge(this.previous().pos)
+          ),
+          ret: null,
+          attributes: []
+        )),
+        pos: start.pos.merge(this.previous().pos)
+      )
+    }
+
+    private expectEndOfStatement(): Bool {
+      if (this.check(TokenType.TokRightBrace)) {
+        // special case -- allows stuff like '{ |a| a }'
+        // We don't consume it here, as the parser needs to check for it.
+        return true
+      }
+      if (this.matches([ TokenType.TokNewline, TokenType.TokEof ])) {
+        // consume any extras
+        this.ignoreNewlines()
+        return true
+      }
+      this.consume(TokenType.TokSemicolon, "Expect newline or semicolon after statement")
+      this.ignoreNewlines() // consume any newlines
+      return false
+    }
+
+    private parseTypePath(): ?TypePath {
+      var absolute: Bool = this.matches([ TokenType.TokScopeResolutionOperator ])
+      var parts = this.parseList(TokenType.TokScopeResolutionOperator) {
+        return this.consume(TokenType.TokTypeIdentifier, "Expect a package name seperated by '::'")
+      }
+      var name = parts.pop()
+      var params = []
+
+      if (this.matches([ TokenType.TokLess ])) {
+        params = this.parseList(TokenType.TokComma) { this.parseTypePath() }
+        this.consume([ TokenType.TokGreater ], "Expect a '>' at the end of a type parameter list")
+      }
+
+      return TypePath(
+        ns: parts.map { it.lexeme },
+        name: name.lexeme,
+        params: params,
+        isAbsolute: absolute
+      )
+    }
+
+    private parseList(sep: String, parser): Array {
+      var items = []
+      do {
+        this.ignoreNewlines()
+        items.push(parser())
+      } while (this.matches([ sep ]) && !this.isAtEnd())
+      return items
+    }
+
+    private ignoreNewlines() {
+      while (!this.isAtEnd()) {
+        if (!this.matches([ TokenType.TokNewline ])) return
+      }
+    }
+
+    private conditionalIgnoreNewlines() {
+      if (this.check(TokenType.TokNewline)) {
+        while (!this.isAtEnd()) {
+          if (this.checkNext(TokenType.TokNewline)) this.advance()
+
+          for (token in static.continuationTokens) {
+            if (this.checkNext(token)) {
+              this.advance()
+              return
+            }
+          }
+
+          if (!this.checkNext(TokNewline)) return
+        }
+      }
+    }
+
+    private matches(types: Array<String>): Bool {
+      for (type in types) {
+        if (this.check(type)) {
+          this.advance()
+          return true
+        }
+      }
+      return false
+    }
+
+    private consume(type: String, message: String): Token {
+      if (this.check(type)) {
+        return this.advance()
+      }
+      throw this.error(this.peek(), message)
+    }
+
+    private check(type: String): Bool {
+      if (this.isAtEnd()) return false
+      return this.peek().type == type
+    }
+
+    private checkNext(type: String): Bool {
+      if (this.isAtEnd()) return false
+      return this.peekNext().type == type
+    }
+
+    private advance(): ?Token {
+      if (!this.isAtEnd()) {
+        return this.tokens[this.current++]
+      }
+      return null
+    }
+
+    private peek(): ?Token { this.tokens[this.current] }
+
+    private peekNext(): ?Token { this.tokens[this.current + 1] }
+
+    private previous(): ?Token { this.tokens[this.current - 1] }
+
+    private isAtEnd(): Bool { this.peek().type == TokenType.TokEof }
+
+    private error(token: Token, message: String) {
+      this.reporter.report(token.pos, message)
+      return ParserException()
     }
   }
 

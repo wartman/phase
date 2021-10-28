@@ -30,7 +30,8 @@ namespace Phase::Language {
     )
     SWhile(
       condition: Expr,
-      body: Stmt
+      body: Stmt,
+      inverted: Bool
     )
     SFor(
       key: String,

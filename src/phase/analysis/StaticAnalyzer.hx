@@ -132,16 +132,14 @@ class StaticAnalyzer
 
   public function visitIfStmt(stmt:Stmt.If) {
     wrapScope(() -> {
-      wrapScope(() -> {
-        stmt.condition.accept(this);
-        stmt.thenBranch.accept(this);
-      });
+      stmt.condition.accept(this);
+      wrapScope(() -> stmt.thenBranch.accept(this));
       wrapScope(() -> if (stmt.elseBranch != null) stmt.elseBranch.accept(this));
     });
   }
 
   public function visitReturnStmt(stmt:Stmt.Return):Void {
-    stmt.value.accept(this);
+    if (stmt.value != null) stmt.value.accept(this);
   }
 
   public function visitVarStmt(stmt:Stmt.Var) {

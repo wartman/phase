@@ -23,7 +23,10 @@ namespace Std {
     
     insert(index: Int, value): Int { this.value[index] = value }
 
-    push(value): Int { this.value[] = value }
+    push(value): Int {
+      this.value[] = value
+      return this.length
+    }
 
     copy(): PhaseArray { clone(this) }
 
