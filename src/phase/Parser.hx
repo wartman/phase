@@ -92,18 +92,28 @@ class Parser {
       () -> consume(TokTypeIdentifier, "Expect a package name seperated by '::'")
     );
 
-    consume(TokLeftBrace, 'Expect `{` after a package name.');
-    ignoreNewlines();
-
-    var decls:Array<Stmt> = [];
-    while (!check(TokRightBrace) && !isAtEnd()) {
-      decls.push(declaration());
+    if (match([ TokLeftBrace ])) {
+      ignoreNewlines();
+  
+      var decls:Array<Stmt> = [];
+      while (!check(TokRightBrace) && !isAtEnd()) {
+        decls.push(declaration());
+      }
+      
+      consume(TokRightBrace, 'Expect `}` at the end of a package declaration.');
+      ignoreNewlines();
+  
+      inNamespace = false;
+      return new Stmt.Namespace(path, decls, attribute);
     }
-    
-    consume(TokRightBrace, 'Expect `}` at the end of a package declaration.');
+
+    // Parse the rest of the file as a single namespace.
+
+    expectEndOfStatement();
+
+    var decls:Array<Stmt> = [ while (!isAtEnd()) declaration() ];
     ignoreNewlines();
 
-    inNamespace = false;
     return new Stmt.Namespace(path, decls, attribute);
   }
 

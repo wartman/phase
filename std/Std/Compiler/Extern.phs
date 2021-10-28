@@ -1,8 +1,6 @@
-namespace Std::Compiler {
+namespace Std::Compiler
 
-  use Attribute
+use Attribute
 
-  [Attribute(Attribute.TARGET_CLASS)]
-  class Extern {}
-
-}
+[Attribute(Attribute.TARGET_CLASS)]
+class Extern {}

@@ -1,19 +1,17 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  enum FieldKind {
-    // Note: will need to add all the complex trait stuff at some point.
-    FUse(type: TypePath)
-    FVar(
-      name: String,
-      type: TypePath,
-      initializer: Expr
-    )
-    FProp(
-      getter: ?FunctionDecl,
-      setter: ?FunctionDecl,
-      type: TypePath
-    )
-    FFun(fun: FunctionDecl)
-  }
-
+enum FieldKind {
+  // Note: will need to add all the complex trait stuff at some point.
+  FUse(type: TypePath)
+  FVar(
+    name: String,
+    type: TypePath,
+    initializer: Expr
+  )
+  FProp(
+    getter: ?FunctionDecl,
+    setter: ?FunctionDecl,
+    type: TypePath
+  )
+  FFun(fun: FunctionDecl)
 }

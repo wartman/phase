@@ -1,6 +1,0 @@
-[Phase::Compiler::Rename('array')]
-[Phase::Compiler::Extern]
-interface Array<T> {
-  // etc
-  join(glue: String): String
-}

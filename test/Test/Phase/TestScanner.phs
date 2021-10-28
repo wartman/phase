@@ -1,19 +1,17 @@
-namespace Test::Phase {
+namespace Test::Phase
 
-  use Phase::{ Scanner, Source }
-  use Phase::Reporter::DefaultErrorReporter
+use Phase::{ Scanner, Source }
+use Phase::Reporter::DefaultErrorReporter
 
-  var source = Source(
-    file: '<test>',
-    content: '
-      var foo = "bar"
-    '
-  )
-  var scanner = Scanner(
-    source: source,
-    reporter: DefaultErrorReporter()
-  )
-  var tokens = scanner.scan()
-  print_r(tokens)
-
-}
+var source = Source(
+  file: '<test>',
+  content: '
+    var foo = "bar"
+  '
+)
+var scanner = Scanner(
+  source: source,
+  reporter: DefaultErrorReporter()
+)
+var tokens = scanner.scan()
+// print_r(tokens)

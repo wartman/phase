@@ -1,7 +1,5 @@
-namespace Phase {
+namespace Phase
 
-  class Compiler {
-    
-  }
-
+class Compiler {
+  
 }

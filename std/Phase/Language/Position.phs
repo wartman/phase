@@ -1,19 +1,17 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  class Position {
-    new(
-      this.start: Int,
-      this.end: Int,
-      this.file: String
-    ) {}
+class Position {
+  new(
+    this.start: Int,
+    this.end: Int,
+    this.file: String
+  ) {}
 
-    merge(other: Position) {
-      return Position(
-        start: this.start,
-        end: other.end,
-        file: this.file
-      )
-    }
+  merge(other: Position) {
+    return Position(
+      start: this.start,
+      end: other.end,
+      file: this.file
+    )
   }
-
 }

@@ -1,155 +1,153 @@
-namespace Std {
+namespace Std
 
-  use ArrayAccess 
-  use Countable
-  use IteratorAggregate
-  use Traversable 
+use ArrayAccess 
+use Countable
+use IteratorAggregate
+use Traversable 
 
-  class PhaseArray 
-    implements ArrayAccess 
-    implements Countable
-    implements IteratorAggregate
-    implements Traversable
-  {
-    private value: $array
+class PhaseArray 
+  implements ArrayAccess 
+  implements Countable
+  implements IteratorAggregate
+  implements Traversable
+{
+  private value: $array
 
-    new(this.value: $array) {}
+  new(this.value: $array) {}
 
-    length: Int { 
-      get { count(this.value) }
-    }
-
-    at(index: Int) { this.value[index] }
-    
-    insert(index: Int, value): Int { this.value[index] = value }
-
-    push(value): Int {
-      this.value[] = value
-      return this.length
-    }
-
-    copy(): PhaseArray { clone(this) }
-
-    filter(f): PhaseArray {
-      var out = []
-      for (item in this.value) {
-        if (f(item)) {
-          out.push(item)
-        }
-      }
-      return out
-    }
-
-    map(transform): PhaseArray {
-      var out = []
-      for (item in this.value) {
-        value |> transform() |> out.push()
-      }
-      return out
-    }
-
-    contains(item): Bool {
-      return this.indexOf(item) != -1
-    }
-
-    indexOf(item): Int {
-      var index = array_search(item, this.value, true)
-      return if (index == false) -1 else index
-    }
-
-    remove(item): Bool {
-      var removed = false
-      for (index in 0..this.length) {
-        if (this.value[index] == item) {
-          array_splice(this.value, index, 1)
-          removed = true
-          break
-        }
-      }
-      return removed
-    }
-
-    reverse() {
-      this.value = array_reverse(this.value);
-    }
-
-    pop() {
-      return array_pop(this.value)
-    }
-
-    shift() {
-      return array_shift(this.value)
-    }
-
-    sort(f) {
-      usort(this.value, f)
-    }
-
-    join(sep: String): String {
-      return this.value |> implode(sep)
-    }
-
-    slice(pos: Int, end: Int = null): PhaseArray {
-      if (pos < 0) {
-        pos = pos + this.length
-      }
-      if (pos < 0) {
-        pos = 0
-      }
-      if (end == null) {
-        return array_slice(this.value, pos)
-      } else {
-        if (end <= 0) {
-          end = end + this.length
-        }
-        if (end <= pos) {
-          return []
-        } else {
-          return array_slice(this.value, pos, end - pos)
-        }
-      }
-    }
-
-    concat(other: PhaseArray) {
-      return PhaseArray(array_merge(this.value, other.unwrap()))
-    }
-    
-    splice(pos: Int, len: Int): PhaseArray {
-      if (len < 0) return [];
-      return array_splice(this.value, pos, len)
-    }
-
-    unshift(item) { array_unshift(this.value, item) }
-
-    offsetGet(offset) {
-      try {
-        return this.value[offset]
-      } catch (e: ::Throwable) {
-        return null
-      }
-    }
-
-    offsetExists(offset) { this.value[offset] |> isset() }
-
-    offsetSet(offset, value) {
-      if (offset == null) {
-        this.value[] = value
-      } else {
-        this.insert(offset, value)
-      }
-    }
-
-    offsetUnset(offset) {
-      if (this.value[offset] |> isset()) {
-        this.value[offset] |> unset()
-      }
-    }
-
-    getIterator(): Traversable { ArrayIterator(this.value) }
-
-    count(): Int { this.length }
-
-    unwrap() { this.value }
+  length: Int { 
+    get { count(this.value) }
   }
 
+  at(index: Int) { this.value[index] }
+  
+  insert(index: Int, value): Int { this.value[index] = value }
+
+  push(value): Int {
+    this.value[] = value
+    return this.length
+  }
+
+  copy(): PhaseArray { clone(this) }
+
+  filter(f): PhaseArray {
+    var out = []
+    for (item in this.value) {
+      if (f(item)) {
+        out.push(item)
+      }
+    }
+    return out
+  }
+
+  map(transform): PhaseArray {
+    var out = []
+    for (item in this.value) {
+      value |> transform() |> out.push()
+    }
+    return out
+  }
+
+  contains(item): Bool {
+    return this.indexOf(item) != -1
+  }
+
+  indexOf(item): Int {
+    var index = array_search(item, this.value, true)
+    return if (index == false) -1 else index
+  }
+
+  remove(item): Bool {
+    var removed = false
+    for (index in 0..this.length) {
+      if (this.value[index] == item) {
+        array_splice(this.value, index, 1)
+        removed = true
+        break
+      }
+    }
+    return removed
+  }
+
+  reverse() {
+    this.value = array_reverse(this.value);
+  }
+
+  pop() {
+    return array_pop(this.value)
+  }
+
+  shift() {
+    return array_shift(this.value)
+  }
+
+  sort(f) {
+    usort(this.value, f)
+  }
+
+  join(sep: String): String {
+    return this.value |> implode(sep)
+  }
+
+  slice(pos: Int, end: Int = null): PhaseArray {
+    if (pos < 0) {
+      pos = pos + this.length
+    }
+    if (pos < 0) {
+      pos = 0
+    }
+    if (end == null) {
+      return array_slice(this.value, pos)
+    } else {
+      if (end <= 0) {
+        end = end + this.length
+      }
+      if (end <= pos) {
+        return []
+      } else {
+        return array_slice(this.value, pos, end - pos)
+      }
+    }
+  }
+
+  concat(other: PhaseArray) {
+    return PhaseArray(array_merge(this.value, other.unwrap()))
+  }
+  
+  splice(pos: Int, len: Int): PhaseArray {
+    if (len < 0) return [];
+    return array_splice(this.value, pos, len)
+  }
+
+  unshift(item) { array_unshift(this.value, item) }
+
+  offsetGet(offset) {
+    try {
+      return this.value[offset]
+    } catch (e: ::Throwable) {
+      return null
+    }
+  }
+
+  offsetExists(offset) { this.value[offset] |> isset() }
+
+  offsetSet(offset, value) {
+    if (offset == null) {
+      this.value[] = value
+    } else {
+      this.insert(offset, value)
+    }
+  }
+
+  offsetUnset(offset) {
+    if (this.value[offset] |> isset()) {
+      this.value[offset] |> unset()
+    }
+  }
+
+  getIterator(): Traversable { ArrayIterator(this.value) }
+
+  count(): Int { this.length }
+
+  unwrap() { this.value }
 }

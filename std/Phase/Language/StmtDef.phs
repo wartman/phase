@@ -1,59 +1,57 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  enum StmtDef {
-    SExpr(expr: Expr)
-    SUse(
-      path: TypePath,
-      kind: StmtUseKind,
-      attributes: Array<Expr>
-    )
-    SNamespace(
-      path: TypePath,
-      decls: Array<Stmt>,
-      attributes: Array<Expr>
-    )
-    SVar(
-      name: String,
-      typeHint: TypePath,
-      initializer: Expr
-    )
-    SGlobal(name: String)
-    SThrow(expr: Expr)
-    STry(
-      body: Stmt,
-      catches: Array<Stmt>
-    )
-    SCatch(
-      name: String,
-      typeHint: TypePath,
-      body: Stmt
-    )
-    SWhile(
-      condition: Expr,
-      body: Stmt,
-      inverted: Bool
-    )
-    SFor(
-      key: String,
-      value: ?String,
-      target: Expr,
-      body: Stmt
-    )
-    SIf(
-      condition: Expr,
-      thenBranch: Stmt,
-      elseBranch: Stmt
-    )
-    SSwitch(
-      target: Expr,
-      cases: Array<MatchCase>
-    )
-    SBlock(
-      statements: Array<Stmt>
-    )
-    SReturn(value: Expr)
-    SFunction(decl:FunctionDecl)
-    SClass(cls:ClassDecl)
-  }
-
+enum StmtDef {
+  SExpr(expr: Expr)
+  SUse(
+    path: TypePath,
+    kind: StmtUseKind,
+    attributes: Array<Expr>
+  )
+  SNamespace(
+    path: TypePath,
+    decls: Array<Stmt>,
+    attributes: Array<Expr>
+  )
+  SVar(
+    name: String,
+    typeHint: TypePath,
+    initializer: Expr
+  )
+  SGlobal(name: String)
+  SThrow(expr: Expr)
+  STry(
+    body: Stmt,
+    catches: Array<Stmt>
+  )
+  SCatch(
+    name: String,
+    typeHint: TypePath,
+    body: Stmt
+  )
+  SWhile(
+    condition: Expr,
+    body: Stmt,
+    inverted: Bool
+  )
+  SFor(
+    key: String,
+    value: ?String,
+    target: Expr,
+    body: Stmt
+  )
+  SIf(
+    condition: Expr,
+    thenBranch: Stmt,
+    elseBranch: Stmt
+  )
+  SSwitch(
+    target: Expr,
+    cases: Array<MatchCase>
+  )
+  SBlock(
+    statements: Array<Stmt>
+  )
+  SReturn(value: Expr)
+  SFunction(decl:FunctionDecl)
+  SClass(cls:ClassDecl)
 }

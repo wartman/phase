@@ -1,8 +1,6 @@
-namespace Phase::Language {
-  
-  enum UseTarget {
-    TargetType(name: Token)
-    TargetFunction(name: Token)
-  }
+namespace Phase::Language
 
+enum UseTarget {
+  TargetType(name: Token)
+  TargetFunction(name: Token)
 }

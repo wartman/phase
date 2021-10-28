@@ -1,9 +1,7 @@
-namespace Phase {
+namespace Phase
 
-  use Phase::Language::Position
+use Phase::Language::Position
 
-  interface ErrorReporter {
-    report(pos: Position, message: String)
-  }
-
+interface ErrorReporter {
+  report(pos: Position, message: String)
 }

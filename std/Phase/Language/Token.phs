@@ -1,12 +1,10 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  class Token {
-    new(
-      this.type: String, // Todo
-      this.lexeme: String,
-      this.literal: String = null,
-      this.pos: Position
-    ) {}
-  }
-
+class Token {
+  new(
+    this.type: String, // Todo
+    this.lexeme: String,
+    this.literal: String = null,
+    this.pos: Position
+  ) {}
 }

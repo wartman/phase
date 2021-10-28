@@ -1,10 +1,8 @@
-namespace Phase {
+namespace Phase
 
-  class Source {
-    new(
-      this.file: String,
-      this.content: String
-    ) {}
-  }
-
+class Source {
+  new(
+    this.file: String,
+    this.content: String
+  ) {}
 }

@@ -1,17 +1,15 @@
-namespace Std {
+namespace Std
 
-  // @todo: we'll look into a method of doing this that doesn't
-  //        require creating a new object every damn time.
-  class PhaseString {
-    private value: $string
+// @todo: we'll look into a method of doing this that doesn't
+//        require creating a new object every damn time.
+class PhaseString {
+  private value: $string
 
-    new(this.value) {}
+  new(this.value) {}
 
-    toLowerCase(): String { this.value |> mb_strtolower() }
+  toLowerCase(): String { this.value |> mb_strtolower() }
 
-    toUpperCase(): String { this.value |> mb_strtoupper() }
+  toUpperCase(): String { this.value |> mb_strtoupper() }
 
-    split(sep: String): PhaseArray { this.value |> explode(sep) |> PhaseArray() }
-  }
-
+  split(sep: String): PhaseArray { this.value |> explode(sep) |> PhaseArray() }
 }

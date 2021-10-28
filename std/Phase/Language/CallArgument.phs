@@ -1,8 +1,6 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  enum CallArgument {
-    Positional(expr: Expr)
-    Named(name: String, expr: Expr)
-  }
-
+enum CallArgument {
+  Positional(expr: Expr)
+  Named(name: String, expr: Expr)
 }

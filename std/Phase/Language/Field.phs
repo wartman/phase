@@ -1,12 +1,10 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  class Field {
-    new(
-      name: String,
-      kind: FieldKind,
-      access: FieldAccess,
-      attributes: Array<Expr>
-    ) {}
-  }
-
+class Field {
+  new(
+    name: String,
+    kind: FieldKind,
+    access: FieldAccess,
+    attributes: Array<Expr>
+  ) {}
 }

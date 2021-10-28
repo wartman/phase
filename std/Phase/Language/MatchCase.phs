@@ -1,11 +1,9 @@
-namespace Phase::Language {
+namespace Phase::Language
 
-  class MatchCase {
-    new(
-      this.condition:Expr,
-      this.body:Array<Stmt>,
-      this.isDefault:Bool
-    ) {}
-  }
-
+class MatchCase {
+  new(
+    this.condition:Expr,
+    this.body:Array<Stmt>,
+    this.isDefault:Bool
+  ) {}
 }

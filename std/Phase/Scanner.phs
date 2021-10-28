@@ -1,334 +1,332 @@
-namespace Phase {
+namespace Phase
 
-  use Phase::Language::{ Token, TokenType, Position }
+use Phase::Language::{ Token, TokenType, Position }
 
-  class Scanner {
-    static keywords = [
-      TokenType.TokClass: TokenType.TokClass,
-      TokenType.TokInterface: TokenType.TokInterface,
-      TokenType.TokTrait: TokenType.TokTrait,
-      TokenType.TokEnum: TokenType.TokEnum,
-      TokenType.TokExtends: TokenType.TokExtends,
-      TokenType.TokImplements: TokenType.TokImplements,
-      TokenType.TokEnum: TokenType.TokEnum,
-      TokenType.TokStatic: TokenType.TokStatic,
-      TokenType.TokPrivate: TokenType.TokPrivate,
-      TokenType.TokPublic: TokenType.TokPublic,
-      TokenType.TokAbstract: TokenType.TokAbstract,
-      TokenType.TokConst: TokenType.TokConst,
-      TokenType.TokFalse: TokenType.TokFalse,
-      TokenType.TokTrue: TokenType.TokTrue,
-      TokenType.TokElse: TokenType.TokElse,
-      TokenType.TokFunction: TokenType.TokFunction,
-      TokenType.TokFor: TokenType.TokFor,
-      TokenType.TokIf: TokenType.TokIf,
-      TokenType.TokNull: TokenType.TokNull,
-      TokenType.TokReturn: TokenType.TokReturn,
-      TokenType.TokSuper: TokenType.TokSuper,
-      TokenType.TokThis: TokenType.TokThis,
-      TokenType.TokVar: TokenType.TokVar,
-      TokenType.TokGlobal: TokenType.TokGlobal,
-      TokenType.TokDo: TokenType.TokDo,
-      TokenType.TokWhile: TokenType.TokWhile,
-      TokenType.TokUse: TokenType.TokUse,
-      TokenType.TokNamespace: TokenType.TokNamespace,
-      TokenType.TokAs: TokenType.TokAs,
-      TokenType.TokIn: TokenType.TokIn,
-      TokenType.TokIs: TokenType.TokIs,
-      TokenType.TokThrow: TokenType.TokThrow,
-      TokenType.TokTry: TokenType.TokTry,
-      TokenType.TokCatch: TokenType.TokCatch,
-      TokenType.TokSwitch: TokenType.TokSwitch,
-      TokenType.TokMatch: TokenType.TokMatch,
-      TokenType.TokCase: TokenType.TokCase,
-      TokenType.TokDefault: TokenType.TokDefault
-    ]
+class Scanner {
+  static keywords = [
+    TokenType.TokClass: TokenType.TokClass,
+    TokenType.TokInterface: TokenType.TokInterface,
+    TokenType.TokTrait: TokenType.TokTrait,
+    TokenType.TokEnum: TokenType.TokEnum,
+    TokenType.TokExtends: TokenType.TokExtends,
+    TokenType.TokImplements: TokenType.TokImplements,
+    TokenType.TokEnum: TokenType.TokEnum,
+    TokenType.TokStatic: TokenType.TokStatic,
+    TokenType.TokPrivate: TokenType.TokPrivate,
+    TokenType.TokPublic: TokenType.TokPublic,
+    TokenType.TokAbstract: TokenType.TokAbstract,
+    TokenType.TokConst: TokenType.TokConst,
+    TokenType.TokFalse: TokenType.TokFalse,
+    TokenType.TokTrue: TokenType.TokTrue,
+    TokenType.TokElse: TokenType.TokElse,
+    TokenType.TokFunction: TokenType.TokFunction,
+    TokenType.TokFor: TokenType.TokFor,
+    TokenType.TokIf: TokenType.TokIf,
+    TokenType.TokNull: TokenType.TokNull,
+    TokenType.TokReturn: TokenType.TokReturn,
+    TokenType.TokSuper: TokenType.TokSuper,
+    TokenType.TokThis: TokenType.TokThis,
+    TokenType.TokVar: TokenType.TokVar,
+    TokenType.TokGlobal: TokenType.TokGlobal,
+    TokenType.TokDo: TokenType.TokDo,
+    TokenType.TokWhile: TokenType.TokWhile,
+    TokenType.TokUse: TokenType.TokUse,
+    TokenType.TokNamespace: TokenType.TokNamespace,
+    TokenType.TokAs: TokenType.TokAs,
+    TokenType.TokIn: TokenType.TokIn,
+    TokenType.TokIs: TokenType.TokIs,
+    TokenType.TokThrow: TokenType.TokThrow,
+    TokenType.TokTry: TokenType.TokTry,
+    TokenType.TokCatch: TokenType.TokCatch,
+    TokenType.TokSwitch: TokenType.TokSwitch,
+    TokenType.TokMatch: TokenType.TokMatch,
+    TokenType.TokCase: TokenType.TokCase,
+    TokenType.TokDefault: TokenType.TokDefault
+  ]
 
-    private source: Source
-    private tokens: Array
-    private reporter: ErrorReporter
-    private start: Int
-    private end: Int
+  private source: Source
+  private tokens: Array
+  private reporter: ErrorReporter
+  private start: Int
+  private end: Int
 
-    new(
-      this.source: Source,
-      this.reporter: ErrorReporter
-    ) {
-      this.tokens = []
+  new(
+    this.source: Source,
+    this.reporter: ErrorReporter
+  ) {
+    this.tokens = []
+  }
+
+  scan() {
+    this.tokens = []
+    this.start = 0
+    this.end = 0
+
+    while(!this.isAtEnd()) {
+      this.start = this.end
+      this.scanToken()
     }
-
-    scan() {
-      this.tokens = []
-      this.start = 0
-      this.end = 0
-
-      while(!this.isAtEnd()) {
-        this.start = this.end
-        this.scanToken()
-      }
-      this.addToken(TokenType.TokEof)
-      
-      return this.tokens
-    }
-
-    scanToken() {
-      var c = this.advance()
-      switch (c) {
-        case '(': this.addToken(TokenType.TokLeftParen)
-        case ')': this.addToken(TokenType.TokRightParen)
-        case '{': this.addToken(TokenType.TokLeftBrace)
-        case '}': this.addToken(TokenType.TokRightBrace)
-        case '[': this.addToken(TokenType.TokLeftBracket)
-        case ']': this.addToken(TokenType.TokRightBracket)
-        case '|': 
-          if (this.matches('|')) {
-            this.addToken(TokenType.TokBoolOr)
-          } else if (this.matches('>')) {
-            this.addToken(TokenType.TokPipe)
-          } else {
-            this.addToken(TokenType.TokBar)
-          }
-        case '&':
-          if (this.matches('&')) {
-            this.addToken(TokenType.TokBoolAnd)
-          } else {
-            this.addToken(TokenType.TokAnd)
-          }
-        case ',': this.addToken(TokenType.TokComma)
-        case '.': this.addToken(TokenType.TokDot)
-        case '-':
-          if (this.matches('>')) {
-            this.addToken(TokenType.TokArrow)
-          } else if (this.matches('-')) {
-            this.addToken(TokenType.TokMinusMinus)
-          } else {
-            this.addToken(TokenType.TokMinus)
-          }
-        case '+':
-          if (this.matches('=')) {
-            this.addToken(TokenType.TokPlusEqual)
-          } else if (this.matches('+')) {
-            this.addToken(TokenType.TokPlusPlus)
-          } else {
-            this.addToken(TokenType.TokPlus)
-          }
-        case ';': this.addToken(TokenType.TokSemicolon)
-        case ':': 
-          if (this.matches(':')) {
-            this.addToken(TokenType.TokScopeResolutionOperator)
-          } else {
-            this.addToken(TokenType.TokColon)
-          }
-        case '*': this.addToken(TokenType.TokStar)
-        case '@': this.addToken(TokenType.TokAt)
-        case '#': this.addToken(TokenType.TokSharp)
-        case '$': this.addToken(TokenType.TokDollar)
-        case '!': this.addToken(if (this.matches('=')) TokenType.TokBangEqual else TokenType.TokBang)
-        case '?': this.addToken(TokenType.TokQuestion)
-        case '=': this.addToken(if (this.matches('=')) TokenType.TokBoolEqual else TokenType.TokEqual)
-        case '<': this.addToken(if (this.matches('=')) TokenType.TokLessEqual else TokenType.TokLess)
-        case '>': this.addToken(if (this.matches('=')) TokenType.TokGreaterEqual else TokenType.TokGreater)
-        case '/': 
-          if (this.matches('/')) {
-            // Comment
-            while (this.peek() != '\n' && !this.isAtEnd()) {
-              this.advance()
-            }
-          } else {
-            this.addToken(TokenType.TokSlash)
-          }
-        case '"': this.string()
-        case "'": this.string("'")
-        case ' ': // ignore
-        case '\r': // ignore
-        case '\t': // ignore
-        case '\n': 
-          // Might be a valid statement end -- checked by the parser.
-          this.newline()
-        default:
-          if (this.isDigit(c)) {
-            this.number()
-          } else if (this.isUcAlpha(c)) {
-            this.typeIdentifier()
-          } else if (this.isAlpha(c)) {
-            this.identifier()
-          } else {
-            this.reporter.report(Position(
-              start: this.start,
-              end: this.end,
-              file: this.source.file
-            ), 'Unexpected character: $c')
-          }
-      }
-    }
-
-    private isAtEnd() {
-      return this.end >= (this.source.content |> strlen())
-    }
-
-    private peek() {
-      if (this.isAtEnd()) {
-        return ''
-      }
-      return this.source.content[this.end]
-    }
-
-    private peekNext() {
-      if (this.isAtEnd()) {
-        return ''
-      }
-      return this.source.content[this.end + 1]
-    }
-
-    private newline() {
-      while (this.peek() == '\n' && !this.isAtEnd()) {
-        this.advance()
-      }
-      this.addToken(TokenType.TokNewline)
-    }
+    this.addToken(TokenType.TokEof)
     
-    private typeIdentifier() {
-      while (this.isAlphaNumeric(this.peek())) this.advance()
-      this.addToken(TokenType.TokTypeIdentifier)
-    }
+    return this.tokens
+  }
 
-    private identifier() {
-      while (this.isAlphaNumeric(this.peek())) this.advance()
-
-      var text = this.getText()
-      var type = if (static.keywords[text] |> isset()) static.keywords[text] else null
-
-      if ((this.peek() == '"' || this.peek() == "'") && type == null) {
-        type = TokenType.TokTemplateTag
-      }
-      
-      if (type != null) {
-        this.addToken(type)
-      } else {
-        this.addToken(TokenType.TokIdentifier)
-      }
-    }
-
-    private string(quote: String = '"', depth: Int = 0) {
-      while (this.peek() != quote && !this.isAtEnd()) {
-        if (this.peek() == '$' && this.peekNext() == '{') {
-          this.addToken(
-            TokenType.TokInterpolation,
-            this.getText()
-          )
-          // Consume `${`
-          this.advance()
-          this.advance()
-          this.interpolatedString(quote, depth)
-          return
+  scanToken() {
+    var c = this.advance()
+    switch (c) {
+      case '(': this.addToken(TokenType.TokLeftParen)
+      case ')': this.addToken(TokenType.TokRightParen)
+      case '{': this.addToken(TokenType.TokLeftBrace)
+      case '}': this.addToken(TokenType.TokRightBrace)
+      case '[': this.addToken(TokenType.TokLeftBracket)
+      case ']': this.addToken(TokenType.TokRightBracket)
+      case '|': 
+        if (this.matches('|')) {
+          this.addToken(TokenType.TokBoolOr)
+        } else if (this.matches('>')) {
+          this.addToken(TokenType.TokPipe)
+        } else {
+          this.addToken(TokenType.TokBar)
         }
-        this.advance()
-      }
-      if (this.isAtEnd()) {
-        // Note: this error is particularly useless
-        this.reporter.report(Position(
-          start: this.start,
-          end: this.end,
-          file: this.source.file
-        ), 'Unterminated string')
-        return
-      }
-
-      // The closing quote
-      this.advance()
-      var value = this.getText() 
-        |> { substr(it, 1, (it |> strlen()) - 2) } 
-      this.addToken(TokenType.TokString, value)
-    }
-
-    private interpolatedString(quote: String, depth: Int) {
-      depth = depth + 1
-      var brackets = 1
-
-      if (depth > 6) {
-        this.reporter.report(Position(
-          start: this.start,
-          end: this.end,
-          file: this.source.file
-        ), 'Interpolation too deep: only 5 levels allowed')
-      }
-
-      while (brackets > 0 && !this.isAtEnd()) {
-        this.start = this.end
-        this.scanToken()
-        // Need to do this so that we can have lambdas and
-        // object literals inside interpolations. Otherwise,
-        // ANY `}` will stop this loop. 
-        if (this.peek() == '{') {
-          brackets = brackets + 1;
+      case '&':
+        if (this.matches('&')) {
+          this.addToken(TokenType.TokBoolAnd)
+        } else {
+          this.addToken(TokenType.TokAnd)
         }
-        if (this.peek() == '}') {
-          brackets = brackets - 1;
+      case ',': this.addToken(TokenType.TokComma)
+      case '.': this.addToken(TokenType.TokDot)
+      case '-':
+        if (this.matches('>')) {
+          this.addToken(TokenType.TokArrow)
+        } else if (this.matches('-')) {
+          this.addToken(TokenType.TokMinusMinus)
+        } else {
+          this.addToken(TokenType.TokMinus)
         }
-      }
-      
-      this.start = this.end;
-      depth = depth - 1;
-      
-      // Continue parsing.
-      this.string(quote, depth);
-    }
-
-    private number() {
-      while (this.isDigit(this.peek()) && !this.isAtEnd()) {
-        this.advance()
-      }
-      if (this.peek() == '.' && this.isDigit(this.peekNext())) {
-        this.advance()
-        while (this.isDigit(this.peek()) && !this.isAtEnd()) {
-          this.advance()
+      case '+':
+        if (this.matches('=')) {
+          this.addToken(TokenType.TokPlusEqual)
+        } else if (this.matches('+')) {
+          this.addToken(TokenType.TokPlusPlus)
+        } else {
+          this.addToken(TokenType.TokPlus)
         }
-      }
-      this.addToken(
-        TokenType.TokNumber,
-        this.getText()
-      )
-    }
-
-    private isDigit(c: String): Bool {
-      return c >= '0' && c <= '9'
-    }
-
-    private isAlpha(c: String): Bool {
-      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
-    }
-
-    isUcAlpha(c: String): Bool {
-      return (c >= 'A' && c <= 'Z')
-    }
-
-    private isAlphaNumeric(c: String): Bool {
-      return this.isAlpha(c) || this.isDigit(c)
-    }
-
-    private advance() { this.source.content[this.end++] }
-
-    private matches(expected: String): Bool {
-      if (this.isAtEnd()) {
-        return false
-      }
-      if (this.source.content[this.end] != expected) {
-        return false
-      }
-      this.end++
-      return true
-    }
-
-    private addToken(type, literal = '') {
-      var text = this.getText()
-      var pos = Position(this.start, this.end, this.source.file)
-      this.tokens.push(Token(type, text, literal, pos))
-    }
-
-    private getText() {
-      return this.source.content 
-        |> { substr(it, this.start, this.end - this.start) }
+      case ';': this.addToken(TokenType.TokSemicolon)
+      case ':': 
+        if (this.matches(':')) {
+          this.addToken(TokenType.TokScopeResolutionOperator)
+        } else {
+          this.addToken(TokenType.TokColon)
+        }
+      case '*': this.addToken(TokenType.TokStar)
+      case '@': this.addToken(TokenType.TokAt)
+      case '#': this.addToken(TokenType.TokSharp)
+      case '$': this.addToken(TokenType.TokDollar)
+      case '!': this.addToken(if (this.matches('=')) TokenType.TokBangEqual else TokenType.TokBang)
+      case '?': this.addToken(TokenType.TokQuestion)
+      case '=': this.addToken(if (this.matches('=')) TokenType.TokBoolEqual else TokenType.TokEqual)
+      case '<': this.addToken(if (this.matches('=')) TokenType.TokLessEqual else TokenType.TokLess)
+      case '>': this.addToken(if (this.matches('=')) TokenType.TokGreaterEqual else TokenType.TokGreater)
+      case '/': 
+        if (this.matches('/')) {
+          // Comment
+          while (this.peek() != '\n' && !this.isAtEnd()) {
+            this.advance()
+          }
+        } else {
+          this.addToken(TokenType.TokSlash)
+        }
+      case '"': this.string()
+      case "'": this.string("'")
+      case ' ': // ignore
+      case '\r': // ignore
+      case '\t': // ignore
+      case '\n': 
+        // Might be a valid statement end -- checked by the parser.
+        this.newline()
+      default:
+        if (this.isDigit(c)) {
+          this.number()
+        } else if (this.isUcAlpha(c)) {
+          this.typeIdentifier()
+        } else if (this.isAlpha(c)) {
+          this.identifier()
+        } else {
+          this.reporter.report(Position(
+            start: this.start,
+            end: this.end,
+            file: this.source.file
+          ), 'Unexpected character: $c')
+        }
     }
   }
 
+  private isAtEnd() {
+    return this.end >= (this.source.content |> strlen())
+  }
+
+  private peek() {
+    if (this.isAtEnd()) {
+      return ''
+    }
+    return this.source.content[this.end]
+  }
+
+  private peekNext() {
+    if (this.isAtEnd()) {
+      return ''
+    }
+    return this.source.content[this.end + 1]
+  }
+
+  private newline() {
+    while (this.peek() == '\n' && !this.isAtEnd()) {
+      this.advance()
+    }
+    this.addToken(TokenType.TokNewline)
+  }
+  
+  private typeIdentifier() {
+    while (this.isAlphaNumeric(this.peek())) this.advance()
+    this.addToken(TokenType.TokTypeIdentifier)
+  }
+
+  private identifier() {
+    while (this.isAlphaNumeric(this.peek())) this.advance()
+
+    var text = this.getText()
+    var type = if (static.keywords[text] |> isset()) static.keywords[text] else null
+
+    if ((this.peek() == '"' || this.peek() == "'") && type == null) {
+      type = TokenType.TokTemplateTag
+    }
+    
+    if (type != null) {
+      this.addToken(type)
+    } else {
+      this.addToken(TokenType.TokIdentifier)
+    }
+  }
+
+  private string(quote: String = '"', depth: Int = 0) {
+    while (this.peek() != quote && !this.isAtEnd()) {
+      if (this.peek() == '$' && this.peekNext() == '{') {
+        this.addToken(
+          TokenType.TokInterpolation,
+          this.getText()
+        )
+        // Consume `${`
+        this.advance()
+        this.advance()
+        this.interpolatedString(quote, depth)
+        return
+      }
+      this.advance()
+    }
+    if (this.isAtEnd()) {
+      // Note: this error is particularly useless
+      this.reporter.report(Position(
+        start: this.start,
+        end: this.end,
+        file: this.source.file
+      ), 'Unterminated string')
+      return
+    }
+
+    // The closing quote
+    this.advance()
+    var value = this.getText() 
+      |> { substr(it, 1, (it |> strlen()) - 2) } 
+    this.addToken(TokenType.TokString, value)
+  }
+
+  private interpolatedString(quote: String, depth: Int) {
+    depth = depth + 1
+    var brackets = 1
+
+    if (depth > 6) {
+      this.reporter.report(Position(
+        start: this.start,
+        end: this.end,
+        file: this.source.file
+      ), 'Interpolation too deep: only 5 levels allowed')
+    }
+
+    while (brackets > 0 && !this.isAtEnd()) {
+      this.start = this.end
+      this.scanToken()
+      // Need to do this so that we can have lambdas and
+      // object literals inside interpolations. Otherwise,
+      // ANY `}` will stop this loop. 
+      if (this.peek() == '{') {
+        brackets = brackets + 1;
+      }
+      if (this.peek() == '}') {
+        brackets = brackets - 1;
+      }
+    }
+    
+    this.start = this.end;
+    depth = depth - 1;
+    
+    // Continue parsing.
+    this.string(quote, depth);
+  }
+
+  private number() {
+    while (this.isDigit(this.peek()) && !this.isAtEnd()) {
+      this.advance()
+    }
+    if (this.peek() == '.' && this.isDigit(this.peekNext())) {
+      this.advance()
+      while (this.isDigit(this.peek()) && !this.isAtEnd()) {
+        this.advance()
+      }
+    }
+    this.addToken(
+      TokenType.TokNumber,
+      this.getText()
+    )
+  }
+
+  private isDigit(c: String): Bool {
+    return c >= '0' && c <= '9'
+  }
+
+  private isAlpha(c: String): Bool {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+  }
+
+  isUcAlpha(c: String): Bool {
+    return (c >= 'A' && c <= 'Z')
+  }
+
+  private isAlphaNumeric(c: String): Bool {
+    return this.isAlpha(c) || this.isDigit(c)
+  }
+
+  private advance() { this.source.content[this.end++] }
+
+  private matches(expected: String): Bool {
+    if (this.isAtEnd()) {
+      return false
+    }
+    if (this.source.content[this.end] != expected) {
+      return false
+    }
+    this.end++
+    return true
+  }
+
+  private addToken(type, literal = '') {
+    var text = this.getText()
+    var pos = Position(this.start, this.end, this.source.file)
+    this.tokens.push(Token(type, text, literal, pos))
+  }
+
+  private getText() {
+    return this.source.content 
+      |> { substr(it, this.start, this.end - this.start) }
+  }
 }
