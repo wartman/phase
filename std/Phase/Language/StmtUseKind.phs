@@ -1,7 +1,0 @@
-namespace Phase::Language
-
-enum StmtUseKind {
-  UseNormal
-  UseAlias(alias:StmtUseTarget)
-  UseSub(items:Array<StmtUseTarget>)
-}

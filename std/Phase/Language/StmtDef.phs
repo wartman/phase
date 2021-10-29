@@ -3,8 +3,8 @@ namespace Phase::Language
 enum StmtDef {
   SExpr(expr: Expr)
   SUse(
-    path: TypePath,
-    kind: StmtUseKind,
+    path: Array<String>,
+    kind: UseKind,
     attributes: Array<Expr>
   )
   SNamespace(
@@ -14,7 +14,7 @@ enum StmtDef {
   )
   SVar(
     name: String,
-    typeHint: ?TypePath,
+    type: ?TypePath,
     initializer: Expr
   )
   SGlobal(name: String)
@@ -25,7 +25,7 @@ enum StmtDef {
   )
   SCatch(
     name: String,
-    typeHint: TypePath,
+    type: TypePath,
     body: Stmt
   )
   SWhile(

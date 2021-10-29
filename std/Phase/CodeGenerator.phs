@@ -1,0 +1,41 @@
+namespace Phase
+
+use Phase::Language::{ Stmt, StmtDef, Expr, Position }
+
+class CodeGenerator {
+  static generate(code: String, pos: Position, reporter: ErrorReporter): Array<Stmt> {
+    var scanner = Scanner(
+      Source(content: code, file: '<generated>'),
+      reporter
+    )
+    var parser = Parser(
+      scanner.scan(),
+      reporter
+    )
+    return parser.parse()
+  }
+
+  static generateStmt(code: String, pos: Position, reporter: ErrorReporter): Stmt {
+    var stmts: Array<Stmt> = static.generate(code, pos, reporter)
+    if (stmts.length != 1) {
+      reporter.report(pos, 'Expected a single statement')
+      throw ParserException()
+    }
+    return stmts[0]
+  }
+
+  static generateExpr(code: String, pos: Position, reporter: ErrorReporter): Expr {
+    var stmts: Array<Stmt> = static.generate(code, pos, reporter)
+    if (stmts.length != 1) {
+      reporter.report(pos, 'Expected a single expression')
+      throw ParserException()
+    }
+    var stmt: StmtDef = stmts[0].stmt
+    match(stmt) {
+      SExpr(expr) -> return expr
+      default -> null
+    }
+    reporter.report(pos, 'Expected an expression')
+    throw ParserException()
+  }
+}

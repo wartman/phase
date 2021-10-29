@@ -1,0 +1,6 @@
+namespace Phase::Language
+
+enum UseTarget {
+  TargetType(name: String)
+  TargetFunction(name: String)
+}

@@ -1,0 +1,7 @@
+namespace Phase::Language
+
+enum UseKind {
+  UseNormal
+  UseAlias(alias:UseTarget)
+  UseSub(items:Array<UseTarget>)
+}

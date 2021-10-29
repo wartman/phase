@@ -715,7 +715,9 @@ class Parser {
 
   function whileStatement():Stmt {
     consume(TokLeftParen, "Expect '(' after 'while'.");
+    ignoreNewlines();
     var condition = expression();
+    ignoreNewlines();
     consume(TokRightParen, "Expect ')' after 'while' condition.");
     var body = statement();
 

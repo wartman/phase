@@ -584,7 +584,7 @@ class PhpGenerator
         out += getIndent() + 'case ' + generateExpr(c.condition) + ':\n';
       }
       indent();
-      out += c.body.map(generateStmt).join('') + '\n';
+      out += c.body.map(generateStmt).join('\n') + '\n';
       out += getIndent() + 'break;\n';
       outdent();
     }

@@ -2,8 +2,8 @@ namespace Phase::Language
 
 class MatchCase {
   new(
-    this.condition:Expr,
-    this.body:Array<Stmt>,
-    this.isDefault:Bool
+    this.condition: Expr,
+    this.body: Array<Stmt>,
+    this.isDefault: Bool
   ) {}
 }
