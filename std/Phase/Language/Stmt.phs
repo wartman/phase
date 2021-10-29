@@ -3,6 +3,6 @@ namespace Phase::Language
 class Stmt {
   new(
     this.stmt: StmtDef,
-    this.position: Position
+    this.pos: Position
   ) {}
 }

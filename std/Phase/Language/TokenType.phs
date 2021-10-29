@@ -24,6 +24,7 @@ enum TokenType as String {
   TokSlash = '\\'
   TokStar = '*'
   TokAnd = '&'
+  TokQuestion = '?'
   TokBoolAnd = '&&'
   TokBoolOr = '||'
   TokScopeResolutionOperator = '::'

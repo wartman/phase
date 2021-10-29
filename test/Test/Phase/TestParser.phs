@@ -1,0 +1,29 @@
+namespace Test::Phase
+
+use Phase::{ Scanner, Source, Parser }
+use Phase::Reporter::DefaultErrorReporter
+
+var source = Source(
+  file: '<test>',
+  content: "
+    class Foo {
+      bar: String = 'bar'
+
+      new () {}
+
+      foo() {
+        return 'foo'
+      } 
+    }
+  "
+)
+var scanner = Scanner(
+  source: source,
+  reporter: DefaultErrorReporter()
+)
+var parser = Parser(
+  tokens: scanner.scan(),
+  reporter: DefaultErrorReporter()
+)
+
+// parser.parse() |> print_r()

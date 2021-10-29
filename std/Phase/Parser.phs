@@ -6,12 +6,18 @@ use Phase::Language::{
   Position,
   Expr,
   ExprDef,
+  Literal,
   Stmt,
   StmtDef,
   TypePath,
   CallArgument,
   FunctionArg,
-  FunctionDecl
+  FunctionDecl,
+  Field,
+  FieldAccess,
+  FieldKind,
+  ClassDecl,
+  ClassKind
   // ... and more
 }
 
@@ -78,14 +84,20 @@ class Parser {
     if (this.matches([ TokenType.TokFunction ])) {
       return this.functionDeclaration(attributes)
     }
+    if (this.matches([ TokenType.TokClass ])) {
+      return this.classDeclaration(attributes)
+    }
+
+    return this.statement()
   }
 
   statement(): Stmt {
+    if (this.matches([ TokenType.TokVar ])) return this.varDeclaration()
+    if (this.matches([ TokenType.TokGlobal ])) return this.globalDeclaration()
     if (this.matches([ TokenType.TokIf ])) return this.ifStatement()
-  }
-
-  private ifStatement(): Stmt {
-
+    if (this.matches([ TokenType.TokReturn ])) return this.returnStatement()
+    
+    return this.expressionStatement()
   }
 
   private namespaceDeclaration(attributes: Array<Expr>): Stmt {
@@ -288,6 +300,291 @@ class Parser {
     )
   }
 
+  private classDeclaration(attributes: Array<Expr>): Stmt {
+    var start: Token = this.previous()
+    var name: Token = this.consume(TokenType.TokTypeIdentifier, "Expect a class name. Must start with an uppercase letter.")
+    var superclass: ?TypePath = null
+    var interfaces: Array<TypePath> = []
+    var fields: Array<Field> = []
+
+    this.ignoreNewlines()
+
+    while (this.matches([
+      TokenType.TokExtends,
+      TokenType.TokImplements
+    ]) && !this.isAtEnd()) {
+      var op: Token = this.previous()
+      if (op == TokenType.TokExtends) {
+        if (superclass != null) {
+          throw this.error(op, 'Can only extend once')
+        }
+        superclass = this.parseTypePath(false)
+      } else {
+        interfaces.push(this.parseTypePath(false))
+      }
+      this.ignoreNewlines()
+    }
+
+    this.consume(TokenType.TokLeftBrace, "Expect '{' before class body.")
+    this.ignoreNewlines()
+
+    while (!this.check(TokenType.TokRightBrace) && !this.isAtEnd()) {
+      this.ignoreNewlines()
+
+      var field: Field = this.fieldDeclaration()
+      var kind: FieldKind = field.kind
+
+      match (kind) {
+        FFun(func) -> for (a in func.args) {
+          if (
+            a.isInit == true
+            && ! (fields[a.name] |> isset())
+          ) {
+            fields.push(Field(
+              name: a.name,
+              kind: FieldKind.FVar(
+                name: a.name,
+                type: a.type,
+                initializer: null
+              ),
+              type: a.type,
+              access: [ FieldAccess.APublic ],
+              attributes: []
+            ))
+          }
+        }
+        default -> null
+      }
+
+      fields.push(field);
+    }
+
+    this.ignoreNewlines()
+    this.consume(TokenType.TokRightBrace, "Expect '}' at end of class body")
+    this.ignoreNewlines()
+
+    return Stmt(
+      stmt: StmtDef.SClass(ClassDecl(
+        name: name.lexeme,
+        kind: ClassKind.KindClass,
+        superclass: superclass,
+        interfaces: interfaces,
+        fields: fields,
+        attributes: attributes
+      )),
+      pos: start.pos.merge(this.previous().pos)
+    )
+  }
+
+  private fieldDeclaration(): Field {
+    if (this.matches([ TokenType.TokUse ])) {
+      // Note: this will need to get more complex later.
+      var out = Field(
+        name: '',
+        kind: FieldKind.FUse(
+          path: this.parseTypePath(false)
+        ),
+        access: [],
+        attributes: []
+      )
+      this.expectEndOfStatement()
+      return out
+    }
+
+    if (this.matches([ TokenType.TokConst ])) {
+      var name = this.consume(TokenType.TokTypeIdentifier, 'Expect uppercase identifier')
+      var type: Type = null
+      if (this.matches([ TokenType.TokColon ])) {
+        type = this.parseTypePath()
+      }
+      this.consume(TokenType.TokEqual, 'Expect assignment for consts')
+      this.ignoreNewlines()
+      var value = this.expression()
+      var out = Field(
+        name: name.lexeme,
+        kind: FieldKind.FVar(
+          name: name.lexeme,
+          type: type,
+          initializer: value
+        ),
+        access: [ AConst ],
+        attributes: []
+      );
+      this.expectEndOfStatement()
+      return out
+    }
+
+    var access: Array<FieldAccess> = []
+    var attributes: Array<Expr> = []
+    var addAccess = {
+      if (access.contains(it)) {
+        throw this.error(this.previous(), 'Only one ${it} declaration is allowed per field')
+      }
+      access.push(it)
+    }
+
+    if (this.matches([ TokenType.TokLeftBracket ])) {
+      attributes = this.attributeList()
+    }
+
+    while (this.matches([
+      TokenType.TokStatic,
+      TokenType.TokPublic,
+      TokenType.TokPrivate,
+      TokenType.TokAbstract
+    ]) && !this.isAtEnd()) {
+      switch (this.previous().type) {
+        case TokenType.TokStatic: addAccess(FieldAccess.AStatic)
+        case TokenType.TokPrivate: addAccess(FieldAccess.APrivate)
+        case TokenType.TokPublic: addAccess(FieldAccess.APublic)
+        case TokenType.TokAbstract: addAccess(FieldAccess.AAbstract)
+        default:
+      }
+    }
+
+    if (access.length == 0 || (!access.contains(FieldAccess.APublic) && !access.contains(FieldAccess.APrivate))) {
+      access.push(FieldAccess.APublic)
+    }
+
+
+    var name: Token = this.consume(TokenType.TokIdentifier, 'Expected an identifier')
+    var type: TypePath = null
+
+    if (this.matches([ TokenType.TokColon ])) {
+      type = this.parseTypePath()
+    }
+
+    if (this.matches([ TokenType.TokNewline ])) {
+      this.ignoreNewlines()
+      return Field(
+        name: name.lexeme,
+        type: type,
+        access: access,
+        kind: FieldKind.FVar(
+          name: name.lexeme,
+          type: type,
+          initializer: null
+        ),
+        attributes: attributes
+      )
+    }
+
+    if (this.matches([ TokenType.TokLeftBrace ])) {
+      var getter: ?FunctionDecl = null
+      var setter: ?FunctionDecl = null
+      while (!this.check(TokenType.TokRightBrace) && !this.isAtEnd()) {
+        this.ignoreNewlines()
+        var mode: Token = this.consume(TokenType.TokIdentifier, "Expect an identifier");
+        switch (mode.lexeme) {
+          case 'get':
+            if (getter != null) {
+              throw this.error(mode, '`get` already defined')
+            }
+            
+            this.consume(TokenType.TokLeftBrace, "Expect a '{'")
+
+            var body = this.functionBody()
+            
+            this.expectEndOfStatement()
+            getter = FunctionDecl(
+              name: mode.lexeme,
+              args: [],
+              body: body,
+              ret: type,
+              attributes: []
+            )
+          case 'set':
+            if (setter != null) {
+              throw this.error(mode, '`set` already defined')
+            }
+            this.consume(TokenType.TokLeftBrace, "Expect a '{'")
+            var body = this.functionBody()
+            this.expectEndOfStatement()
+            setter = FunctionDecl(
+              name: mode.lexeme,
+              args: [
+                FunctionArg(
+                  name: 'value',
+                  typeHint: type,
+                  expr: null
+                )
+              ],
+              body: body,
+              ret: type,
+              attributes: []
+            )
+          default:
+            throw this.error(mode, 'Expected `get` or `set`')
+        }
+      }
+      this.ignoreNewlines()
+      this.consume(TokenType.TokRightBrace, 'Expected a `}`')
+      return Field(
+        name: name.lexeme,
+        type: type,
+        access: access,
+        kind: FieldKind.FProp(
+          getter: getter,
+          setter: setter,
+          type: type
+        ),
+        attributes: attributes
+      )
+    }
+
+    if (this.matches([ TokenType.TokEqual ])) {
+      if (access.contains(FieldAccess.AAbstract)) {
+        throw this.error(this.previous(), 'No assignment allowed')
+      }
+
+      this.ignoreNewlines()
+      var expr = this.expression()
+      this.expectEndOfStatement()
+      return Field(
+        name: name.lexeme,
+        type: type,
+        access: access,
+        kind: FieldKind.FVar(
+          name: name.lexeme,
+          type: type,
+          initializer: expr
+        ),
+        attributes: attributes
+      )
+    }
+
+    this.consume(TokenType.TokLeftParen, "Expect '(' after function name.")
+    var args = this.functionArgs(name.lexeme == 'new');
+    var type: ?TypePath = null
+    var body:Stmt = null;
+    
+    if (this.matches([ TokenType.TokColon])) {
+      type = this.parseTypePath()
+    }
+
+    if (access.contains(FieldAccess.AAbstract)) {
+      this.expectEndOfStatement()
+    } else {
+      this.consume(TokenType.TokLeftBrace, "Expect '{' before function body")
+      body = this.functionBody()
+      this.expectEndOfStatement()
+    }
+
+    return Field(
+      name: name.lexeme,
+      access: access,
+      type: type,
+      kind: FieldKind.FFun(FunctionDecl(
+        name: name.lexeme,
+        args: args,
+        body: body,
+        ret: type,
+        attributes: []
+      )),
+      attributes: attributes
+    )
+  }
+
   private attributeList(): Array<Expr> {
     var attributes: Array<Expr> = []
     var start = this.previous()
@@ -323,7 +620,87 @@ class Parser {
 
     return attributes
   }
-  
+
+  private expressionStatement() {
+    var expr = this.expression()
+    this.expressionStatement()
+    return Stmt(
+      stmt: StmtDef.SExpr(expr),
+      pos: expr.pos
+    )
+  }
+
+  private block(): Array<Stmt> {
+    var statements: Array<Stmt> = []
+
+    this.ignoreNewlines()
+
+    while (!this.check(TokenType.TokRightBrace) && !this.isAtEnd()) {
+      statements.push(this.declaration())
+    }
+    this.ignoreNewlines()
+    this.consume(TokenType.TokRightBrace, "Expect '}' at the end of a block.")
+    
+    return statements
+  }
+
+  private ifStatement(): Stmt {
+    var start = this.previous()
+
+    this.consume(TokenType.TokLeftParen, "Expect '(' after 'if'.")
+
+    this.ignoreNewlines()
+    var condition: Expr = this.expression()
+    this.ignoreNewlines()
+
+    this.consume(TokenType.TokRightParen, "Expect ')' after if condition.")
+
+    var thenBranch: Stmt = this.statement()
+    var def: StmtDef = thenBranch.def
+
+    match (def) {
+      SBlock(_) -> null
+      default -> thenBranch = Stmt(
+        stmt: StmtDef.SBlock(thenBranch),
+        pos: thenBranch.pos
+      )
+    }
+
+    var elseBranch: ?Stmt = null
+    if (this.matches([ TokenType.TokElse ])) {
+      elseBranch = this.statement()
+      var def: StmtDef = elseBranch.def
+      match (def) {
+        SBlock(_) -> null
+        default -> elseBranch = Stmt(
+          stmt: StmtDef.SBlock(elseBranch),
+          pos: elseBranch.pos
+        )
+      }
+    }
+
+    return Stmt(
+      stmt: StmtDef.SIf(condition, thenBranch, elseBranch),
+      pos: start.pos.merge(this.previous().pos)
+    )
+  }
+
+  private returnStatement(): Stmt {
+    var start = this.previous()
+    var value: Expr = null
+    
+    if (!this.check(TokenType.TokSemicolon) && !this.check(TokenType.TokNewline)) {
+      value = this.expression()
+    }
+    
+    this.expectEndOfStatement()
+
+    return Stmt(
+      stmt: StmtDef.SReturn(value),
+      pos: start.pos.merge(this.previous().pos)
+    )
+  }
+
   private matchExpr(): Expr {
     // todo
   }
@@ -686,33 +1063,40 @@ class Parser {
   private primary(): Expr {
     if (this.matches([ TokenType.TokFalse ])) {
       return Expr(
-        expr: ExprDef.ELiteral(false),
+        expr: ExprDef.ELiteral(Literal.LFalse()),
         pos: this.previous().pos
       )
     }
     if (this.matches([ TokenType.TokTrue ])) {
       return Expr(
-        expr: ExprDef.ELiteral(true),
+        expr: ExprDef.ELiteral(Literal.LTrue()),
         pos: this.previous().pos
       )
     }
     if (this.matches([ TokenType.TokNull ])) {
       return Expr(
-        expr: ExprDef.ELiteral(null),
+        expr: ExprDef.ELiteral(Literal.LNull()),
         pos: this.previous().pos
       )
     }
-    if (this.matches([ TokenType.TokNumber, TokenType.TokString ])) {
+    if (this.matches([ TokenType.TokNumber ])) {
       var literal = this.previous()
       return Expr(
-        expr: ExprDef.ELiteral(literal.literal),
+        expr: ExprDef.ELiteral(Literal.LNumber(literal.literal)),
+        pos: literal.pos
+      )
+    }
+    if (this.matches([ TokenType.TokString ])) {
+      var literal = this.previous()
+      return Expr(
+        expr: ExprDef.ELiteral(Literal.LString(literal.literal)),
         pos: literal.pos
       )
     }
     if (this.matches([ TokenType.TokInterpolation ])) {
       var literal = this.previous()
       return this.interpolation(Expr(
-        expr: ExprDef.ELiteral(literal.literal),
+        expr: ExprDef.ELiteral(Literal.LString(literal.literal)),
         pos: literal.pos
       ))
     }
@@ -885,7 +1269,13 @@ class Parser {
     return false
   }
 
-  private parseTypePath(): ?TypePath {
+  private parseTypePath(allowNullable: Bool = true): ?TypePath {
+    var nullable: Bool = this.matches([ TokenType.TokQuestion ])
+  
+    if (nullable && !allowNullable) {
+      throw this.error(this.previous(), "Nullable types are not allowed here")
+    }
+
     var absolute: Bool = this.matches([ TokenType.TokScopeResolutionOperator ])
     var parts = this.parseList(TokenType.TokScopeResolutionOperator) {
       return this.consume(TokenType.TokTypeIdentifier, "Expect a package name seperated by '::'")
@@ -902,7 +1292,8 @@ class Parser {
       ns: parts.map { it.lexeme },
       name: name.lexeme,
       params: params,
-      isAbsolute: absolute
+      isAbsolute: absolute,
+      isNullable: nullable
     )
   }
 
@@ -933,7 +1324,7 @@ class Parser {
           }
         }
 
-        if (!this.checkNext(TokNewline)) return
+        if (!this.checkNext(TokenType.TokNewline)) return
       }
     }
   }

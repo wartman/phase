@@ -2,9 +2,9 @@ namespace Phase::Language
 
 class ClassDecl {
   new(
-    this.name: Expr,
-    this.kind: ClassKind,
-    this.superclass: TypePath,
+    this.name: String,
+    this.kind: String,
+    this.superclass: ?TypePath,
     this.interfaces: Array<TypePath>,
     this.fields: Array<Field>,
     this.attributes: Array<Expr>

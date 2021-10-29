@@ -63,7 +63,7 @@ enum ExprDef {
   EThis()
   EStatic()
   EGrouping(expr: Expr)
-  ELiteral(value: Any)
+  ELiteral(value: Literal)
   EArrayLiteral(
     values: Array<Expr>,
     isNative: Bool

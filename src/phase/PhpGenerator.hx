@@ -1,5 +1,6 @@
 package phase;
 
+import phase.Expr.CallArgument;
 import phase.analysis.StaticAnalyzer;
 
 using Type;
@@ -54,6 +55,8 @@ class PhpGenerator
   final server:Server;
   var mode:GeneratorMode = GeneratingRoot;
   var closureCaptures:Array<String> = [];
+  var classLocalInits:Map<Stmt.Field, Expr> = [];
+  var classStaticInits:Map<Stmt.Field, Expr> = [];
   var scope:PhpScope;
   var localDepth:Int;
   var indentLevel:Int = 0;
@@ -201,6 +204,7 @@ class PhpGenerator
   public function visitClassStmt(stmt:Stmt.Class):String {
     var out = '';
     var props:Array<String> = [];
+    var body = '';
     
     if (stmt.attribute.length > 0) {
       out += generateAttributes({ cls: stmt }, stmt.attribute);
@@ -241,9 +245,17 @@ class PhpGenerator
       case KindTrait: GeneratingTrait;
     }
 
+    classLocalInits = [];
+    classStaticInits = [];
+
+    var constructor = stmt.fields.find(stmt -> stmt.name.lexeme == 'new');
+
     for (field in stmt.fields) {
+      if (field == constructor) {
+        continue;
+      }
       if (field.attribute.length > 0) {
-        out += generateAttributes({
+        body += generateAttributes({
           cls: stmt,
           field: field.name.lexeme
         }, field.attribute);
@@ -253,8 +265,88 @@ class PhpGenerator
           props.push(safeVar(field.name));
         default:
       }
-      out += generateStmt(field) + '\n';
+      body += generateStmt(field) + '\n';
     }
+
+    // todo: this will need to be tested.
+    if (mode != GeneratingInterface) if (constructor == null && classLocalInits.count() > 0) {
+      var name = new Token(TokIdentifier, 'new', '', stmt.name.pos);
+      var args = [];
+      var init:Stmt = if (stmt.superclass != null) {
+        var type = context.typeOf(stmt.superclass);
+        trace(type);
+        var superConstructor = switch type {
+          case TClass(cls) | TInstance(cls):
+            cls.fields.find(f -> f.name == 'new');
+          default: null;
+        }
+        args = if (superConstructor != null) switch superConstructor.kind {
+          case TMethod(fun): fun.args;
+          default: [];
+        } else [];
+        new Stmt.Expression(
+          new Expr.Call(
+            new Expr.Super(name, new Token(TokIdentifier, 'new', '', name.pos)),
+            name,
+            args.map(arg -> CallArgument.Positional(new Expr.Variable(
+              new Token(TokIdentifier, arg.name, '', name.pos)
+            )))
+          )
+        );
+      } else null;
+      constructor = new Stmt.Field(
+        name,
+        FFun(new Stmt.Function(
+          name,
+          args.map(arg -> {
+            name: new Token(TokIdentifier, arg.name, '', name.pos),
+            type: null,
+            expr: null,
+            isInit: false
+          }),
+          new Stmt.Block([ init ].filter(n -> n != null)),
+          null,
+          []
+        )),
+        [ APublic ],
+        []
+      );
+    }
+
+    if (mode != GeneratingInterface && constructor != null) if (classLocalInits.count() > 0) {
+      var pre:Array<Stmt> = [];
+      for (field => expr in classLocalInits) {
+        var name = field.name;
+        pre.push(new Stmt.Expression(
+          new Expr.Set(
+            new Expr.This(name),
+            new Expr.Variable(name),
+            expr
+          )
+        ));
+      }
+      var fun = switch constructor.kind {
+        case FFun(fun): fun;
+        default: throw 'assert';
+      }
+      constructor.kind = FFun(new Stmt.Function(
+        fun.name,
+        fun.params,
+        switch Std.downcast(fun.body, Stmt.Block) {
+          case null:
+            new Stmt.Block(pre.concat([ fun.body ]));
+          case block:
+            for (stmt in pre) block.statements.unshift(stmt);
+            block;
+        },
+        fun.ret,
+        fun.attribute
+      ));
+    }
+
+    if (constructor != null) body = generateStmt(constructor) + '\n' + body;
+
+    out += body;
 
     if (props.length > 0) {
       // @todo: this is iffy -- make better
@@ -273,11 +365,26 @@ class PhpGenerator
       out += '\n' + getIndent() + "}";
     }
 
-    mode = prevMode;
     scope.pop();
 
     outdent();
-    return out + '\n' + getIndent() + '}';
+    out += '\n' + getIndent() + '}';
+
+    if (classStaticInits.count() > 0) {
+      for (field => expr in classStaticInits) {
+        var name = field.name;
+        out += '\n' + generateStmt(new Stmt.Expression(
+          new Expr.Set(
+            new Expr.Type([ stmt.name ], false, false),
+            new Expr.Variable(name),
+            expr
+          )
+        ));
+      }
+    }
+    
+    mode = prevMode;
+    return out;
   }
   
   public function visitFieldStmt(stmt:Stmt.Field):String {
@@ -302,7 +409,13 @@ class PhpGenerator
           ? ' ' + safeVar(stmt.name)
           : ' $' + safeVar(stmt.name);
         if (v.initializer != null) {
-          out += ' = ' + generateExpr(v.initializer);
+          if (isConst) {
+            out += ' = ' + generateExpr(v.initializer);
+          } else if (stmt.access.contains(AStatic)) {
+            classStaticInits.set(stmt, v.initializer);
+          } else {
+            classLocalInits.set(stmt, v.initializer);
+          }
         }
         out + ';';
       case FProp(getter, setter, type):
@@ -617,7 +730,7 @@ class PhpGenerator
 
     var cls = generateTypePath(new Expr.Type([ 
       new Token(TokTypeIdentifier, 'Array', 'Array', null)
-    ], true));
+    ], true, false));
     return 'new $cls([' + generateList(expr.values) + '])';
   }
 
@@ -909,6 +1022,9 @@ class PhpGenerator
     }
     if (t.absolute) {
       type = '\\' + type;
+    }
+    if (t.nullable) {
+      type = '?' + type;
     }
     return type;
   }

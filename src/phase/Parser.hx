@@ -71,6 +71,8 @@ class Parser {
   }
 
   function statement():Stmt {
+    if (match([ TokVar ])) return varDeclaration();
+    if (match([ TokGlobal ])) return globalDeclaration();
     if (match([ TokIf ])) return ifStatement();
     if (match([ TokWhile ])) return whileStatement();
     if (match([ TokDo ])) return doStatement();
@@ -371,7 +373,7 @@ class Parser {
       ignoreNewlines();
       var name = consume(TokTypeIdentifier, 'Expect an uppercase identifier');
       var params:Array<FunctionArg> = [];
-      var ret = new Expr.Type([ enumName ], false);
+      var ret = new Expr.Type([ enumName ], false, false);
 
       if (!check(TokNewline)) {
         consume(TokLeftParen, 'Expect \'(\' after function name.');
@@ -403,7 +405,8 @@ class Parser {
         new Token(TokTypeIdentifier, 'Std', 'Std', enumName.pos),
         new Token(TokTypeIdentifier, 'PhaseEnum', 'PhaseEnum', enumName.pos)
       ],
-      true
+      true,
+      false
     ), [], fields, attribute);
   }
 
@@ -507,7 +510,6 @@ class Parser {
       TokPublic,
       TokPrivate,
       TokAbstract
-      // Todo: we need getters and setters as well
     ]) && !isAtEnd()) switch previous().type {
       case TokStatic: addAccess(AStatic);
       case TokPrivate: addAccess(APrivate);
@@ -678,7 +680,9 @@ class Parser {
 
   function ifStatement():Stmt {
     consume(TokLeftParen, "Expect '(' after 'if'.");
+    ignoreNewlines();
     var condition:Expr = expression();
+    ignoreNewlines();
     consume(TokRightParen, "Expect ')' after if condition.");
 
     var thenBranch = statement();
@@ -836,7 +840,7 @@ class Parser {
     ignoreNewlines();
     var statements:Array<Stmt> = [];
     while (!check(TokRightBrace) && !isAtEnd()) {
-      statements.push(declaration());
+      statements.push(statement());
     }
     ignoreNewlines();
     consume(TokRightBrace, "Expect '}' at the end of a block.");
@@ -1244,7 +1248,7 @@ class Parser {
       advance();
       path.push(advance());
     }
-    var type = new Expr.Type(path, isAbsolute);
+    var type = new Expr.Type(path, isAbsolute, false);
     if (match([ TokScopeResolutionOperator ])) {
       var tok = consume(TokIdentifier, "Expect an identifier");
       return new Expr.Namespaced(type, tok);
@@ -1390,13 +1394,14 @@ class Parser {
   }
 
   function parseTypePath():Expr.Type {
+    var nullable = false;
     if (match([ TokQuestion ])) {
-      // @todo: mark as nullable
+      nullable = true;
     }
 
     if (match([ TokDollar ])) {
       var native = consume(TokIdentifier, 'Expect a native PHP scalar identifier');
-      return new Expr.Type([ native ], false);
+      return new Expr.Type([ native ], false, nullable);
     }
 
     var absolute = match([ TokScopeResolutionOperator ]);
@@ -1411,7 +1416,7 @@ class Parser {
       consume(TokGreater, 'Expect a `>` after type params');
     }
 
-    return new Expr.Type(path, absolute);
+    return new Expr.Type(path, absolute, nullable);
   }
 
   function tempVar(prefix:String) {

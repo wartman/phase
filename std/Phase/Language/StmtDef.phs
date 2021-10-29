@@ -14,7 +14,7 @@ enum StmtDef {
   )
   SVar(
     name: String,
-    typeHint: TypePath,
+    typeHint: ?TypePath,
     initializer: Expr
   )
   SGlobal(name: String)

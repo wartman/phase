@@ -48,7 +48,7 @@ class Range implements Expr {
 }
 
 enum CallArgument {
-  Positional(expr:Expr);
+Positional(expr:Expr);
   Named(name:String, expr:Expr);
 }
 
@@ -129,6 +129,7 @@ class Lambda implements Expr {
 class Type implements Expr {
   var path:Array<Token>;
   var absolute:Bool;
+  var nullable:Bool;
 }
 
 class Namespaced implements Expr {

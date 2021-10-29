@@ -5,6 +5,7 @@ class TypePath {
     this.ns: Array<String>,
     this.name: String,
     this.params: Array<TypePath>,
-    this.isAbsolute: Bool = false
+    this.isAbsolute: Bool = false,
+    this.isNullable: Bool = false
   ) {}
 }
