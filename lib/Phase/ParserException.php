@@ -1,0 +1,11 @@
+<?php
+namespace Phase {
+
+  use Exception;
+
+  class ParserException extends Exception
+  {
+
+  }
+
+}

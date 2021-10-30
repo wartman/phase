@@ -1,15 +1,7 @@
 namespace Phase
 
-class Generator {
+interface Generator {
   private statements: Array
   private reporter: ErrorReporter
-
-  new(
-    this.statements: Array,
-    this.reporter: ErrorReporter
-  ) {}
-
-  generate(): String {
-    return 'todo'
-  }
+  generate(): String
 }

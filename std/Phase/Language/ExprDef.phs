@@ -60,6 +60,7 @@ enum ExprDef {
     elseBranch: Expr
   )
   ESuper(method: String)
+  EPath(path:TypePath)
   EThis()
   EStatic()
   EGrouping(expr: Expr)

@@ -4,26 +4,30 @@ PHP, but without the bad parts.
 
 Should (eventually) compile to clean, well formatted, useable PHP.
 
+Status
+------
+Currently implementing a self-hosting compiler. As you might expect, a PHP-based compiler is *not* the fastest, so a current bottleneck is dealing with the large size of some of the parser classes. Once the Phase-based compiler is complete, the next step will be to figure out some optimization strategies to get compile times down.
+
+That said, most things work! If you're not writing lots of classes with thousands of lines of code, it might even be useful.
+
 Syntax
 ------
 Here's a quick example:
 
 ```phase
-package Some::Example {
+namespace Some::Example
 
-  class Foo {
+class Foo {
 
-    foo
-    bar = 'bar'
+  foo: String
+  bar: String = 'bar'
 
-    new(foo) {
-      this.foo = foo
-    }
+  new(foo: String) {
+    this.foo = foo
+  }
 
-    sayFoo() {
-      return this.foo + this.bar
-    }
-
+  sayFoo(): String {
+    return this.foo + this.bar
   }
 
 }
@@ -188,3 +192,49 @@ var example = { |a, b| a +++ b }
 ```
 
 (This is likely a place for optimization and inlining)
+
+Enums
+-----
+
+Phase has two kinds of enums -- simple, value based ones and Haxe-inspired, ADT-style types.
+
+Value based enums may (currently) only be Ints or Strings, and require an `as` statement:
+
+```phs
+enum FooBar as String {
+  Foo
+  Bar
+}
+
+FooBar.Foo == 'Foo' // -> true
+```
+
+The above class will automatically generate values for its constructors, based on the enum constructor name ("Foo" and "Bar" in this case). You can also provide your own values, if needed:
+
+```phs
+enum FooBar as String {
+  Foo = 'foob'
+  Bar = 'some other value'
+}
+
+FooBar.Foo == 'foob' // -> true
+```
+
+ADT (Algebraic Data Type) style enums are much more powerful, and might look like this:
+
+```phs
+enum Result {
+  Success(value: Any)
+  Failure(error: String)
+}
+
+var success: Result = Result.Success('foo')
+success is Result // -> true
+match (success) {
+  Success(value) -> value |> print() // -> 'foo'
+  Failure(error) -> error |> print() // -> (never reached)
+}
+```
+
+Enum constructors can have as many or as few parameters as you want.
+

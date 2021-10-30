@@ -601,7 +601,7 @@ class Parser {
     this.ignoreNewlines()
     var index = 0
 
-    while (!check(TokRightBrace) && !isAtEnd()) {
+    while (!this.check(TokenType.TokRightBrace) && !this.isAtEnd()) {
       this.ignoreNewlines()
       var name = this.consume(TokenType.TokTypeIdentifier, 'Expect an uppercase identifier')
       var params:Array<FunctionArg> = []
@@ -1547,28 +1547,143 @@ class Parser {
   }
 
   private arrayOrMapLiteral(isNative: Bool = false): Expr {
-    // todo
+    this.ignoreNewlines()
+    if (this.checkNext(TokenType.TokColon)) {
+      return this.mapLiteral(isNative)
+    }
+    return this.arrayLiteral(isNative)
   }
 
   private arrayLiteral(isNative: Bool): Expr {
-    // todo
+    var start: Token = this.previous()
+    var rewindPoint = this.current
+
+    if (!this.check(TokenType.TokRightBracket)) {
+      var values = this.parseList(TokenType.TokComma) { this.expression() }
+    }
+
+    if (this.matches([ TokenType.TokColon ])) {
+      this.current = rewindPoint
+      return this.mapLiteral(isNative)
+    }
+
+    this.ignoreNewlines() // May be a newline after the last item in the list
+    var end = this.consume(TokenType.TokRightBracket, "Expect ']' after values")
+    return Expr(
+      expr: ExprDef.EArrayLiteral(
+        values: values,
+        isNative: isNative
+      ),
+      pos: start.pos.merge(end.pos)
+    )
   }
 
   private mapLiteral(isNative: Bool): Expr {
-    // todo
+    var start: Token = this.previous()
+    var keys: Array<Expr> = []
+    var values: Array<Expr> = []
+
+    if (!this.check(TokenType.TokRightBracket)) {
+      do {
+        this.ignoreNewlines()
+        keys.push(this.expression())
+        this.consume(TokenType.TokColon, "Expect ':' after map keys")
+        this.ignoreNewlines()
+        values.push(this.expression())
+      } while (this.matches([ TokenType.TokComma ]))
+      this.ignoreNewlines()
+    }
+
+    var end = this.consume(TokenType.TokRightBracket, "Expect ']' at the end of a mapliteral")
+    
+    return Expr(
+      expr: ExprDef.EMapLiteral(
+        keys: keys,
+        values: values,
+        isNative: isNative
+      ),
+      pos: start.pos.merge(end.pos)
+    )
   }
 
   private taggedTemplate(callee: Expr): Expr {
-    // todo
+    var parts: Array<Expr> = []
+    var placeholders: Array<Expr> = []
+
+    // Note: Interpolated strings end on a `TokString`
+    if (!this.check(TokenType.TokString)) {
+      do {
+        if (this.matches([ TokenType.TokInterpolation ])) {
+          parts.push(Expr(
+            expr: ExprDef.ELiteral(Literal.LString(this.previous().literal)),
+            pos: this.previous().pos
+          ))
+        } else {
+          placeholders.push(this.expression())
+        }
+      } while (!this.check(TokenType.TokString) && !this.isAtEnd())
+    }
+
+    parts.push(this.primary())
+
+    var partsPos = if (parts.length > 0)
+      parts[0].pos.merge(parts[parts.length - 1].pos)
+      else this.previous().pos
+      
+    var placeholdersPos = if (placeholders.length > 0)
+      placeholders[0].pos.merge(placeholders[placeholders.length - 1].pos)
+      else this.previous().pos
+
+    return Expr(
+      expr: ExprDef.ECall(callee, [
+        CallArgument.Positional(Expr(
+          expr: ExprDef.EArrayLiteral(parts, false),
+          pos: partsPos
+        )),
+        CallArgument.Positional(Expr(
+          expr: ExprDef.EArrayLiteral(placeholders, false),
+          pos: placeholdersPos
+        ))
+      ]),
+      pos: callee.pos.merge(this.previous().pos)
+    )
   }
 
-  private interpolation(callee: Expr): Expr {
+  private interpolation(expr: Expr): Expr {
     while (!this.isAtEnd()) {
       var next: Expr = null
-      if (this.matches([ TokenType.TokString ])) {
-        // todo
+      if (this.check(TokenType.TokString)) {
+        return Expr(
+          expr: ExprDef.EBinary(expr, '+', this.primary()),
+          pos: expr.pos.merge(this.previous().pos)
+        )
+      } else if (this.matches([ TokenType.TokInterpolation ])) {
+        next = Expr(
+          expr: ExprDef.ELiteral(Literal.LString(this.previous().literal)),
+          pos: this.previous().pos
+        )
+      } else {
+        var expr = this.expression()
+        next = Expr(
+          expr: EGrouping(expr),
+          pos: expr.pos
+        )
       }
+      expr = Expr(
+        expr: ExprDef.EBinary(expr, '+', next),
+        pos: expr.pos.merge(next.pos)
+      )
     }
+    throw this.error(this.peek(), "Unexpected end of interpolated string")
+  }
+
+  private pathExpr() {
+    var start: Token = this.peek()
+    var path: TypePath = this.parseTypePath(false)
+    return Expr(
+      expr: ExprDef.EPath(path),
+      pos: start.pos.merge(this.previous().pos)
+    )
   }
 
   private primary(): Expr {
@@ -1635,13 +1750,12 @@ class Parser {
         pos: keyword.pos
       )
     }
-    // if (match([ TokScopeResolutionOperator ])) {
-    //   return namespacedExprOrType(true);
-    // }
-
-    // if (check(TokTypeIdentifier)) {
-    //   return namespacedExprOrType(false);
-    // }
+    if (
+      this.check(TokenType.TokScopeResolutionOperator)
+      ||this.check(TokenType.TokTypeIdentifier)
+    ) {
+      return this.pathExpr();
+    }
     if (this.matches([ TokenType.TokIdentifier ])) {
       var variable = this.previous()
       return Expr(
@@ -1667,19 +1781,17 @@ class Parser {
         pos: start.pos.merge(end.pos)
       )
     }
-    // if (match([ TokDollar ])) {
-    //   if (match([ TokLeftBracket ])) {
-    //     return arrayOrMapLiteral(true);
-    //   }
-    // }
+    if (this.matches([ TokenType.TokDollar ])) {
+      if (this.matches([ TokenType.TokLeftBracket ])) {
+        return this.arrayOrMapLiteral(true);
+      }
+    }
     if (this.matches([ TokenType.TokLeftBracket ])) {
       return this.arrayOrMapLiteral()
     }
-
     if (this.matches([ TokenType.TokLeftBrace ])) {
       return this.shortLambda(!this.check(TokenType.TokNewline))
     }
-
     if (this.matches([ TokenType.TokFunction ])) {
       var start = this.previous()
       return Expr(
@@ -1687,11 +1799,9 @@ class Parser {
         pos: start.pos.merge(this.previous().pos)
       )
     }
-
     if (this.matches([ TokenType.TokIf ])) {
       return this.ternary()
     }
-
     if (this.matches([ TokenType.TokMatch ])) {
       return this.matchExpr()
     }
