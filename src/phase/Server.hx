@@ -16,23 +16,31 @@ class Server {
     this.reporterFactory = reporterFactory;
   }
 
-  public function locateType(name:String):Type {
-    if (types.exists(name)) return types.get(name);
+  public function locateType(path:String):Type {
+    // trace('loading: $path');
+    if (types.exists(path)) {
+      // trace('$path ready');
+      return types.get(path);
+    }
+    
+    // trace('$path needs typing');
 
-    var path = name.split('::').join('/').normalize().withExtension('phs');
-    var source = io.getSource(path);
+    var ns = path.split('::');
+    var name = ns.pop();
+    var filePath = ns.concat([ name ]).join('/').normalize().withExtension('phs');
+    var source = io.getSource(filePath);
     var reporter = reporterFactory(source);
-    var scanner = new Scanner(source, path, reporter);
+    var scanner = new Scanner(source, filePath, reporter);
     var parser = new Parser(scanner.scan(), reporter);
     var analyzer = new StaticAnalyzer(parser.parse(), this, reporter);
     var context = analyzer.analyze();
 
     for (name => type in context.getTypes()) {
-      types.set(name, type);
+      types.set(ns.concat([ name ]).join('::'), type);
     }
 
-    if (!types.exists(name)) {
-      throw 'The module $name does not define the type $name';
+    if (!types.exists(path)) {
+      throw 'The module $path does not define the type $path';
     }
 
     return types.get(name);

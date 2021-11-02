@@ -1,0 +1,7 @@
+namespace Phase
+
+use Phase::Language::{ Type }
+
+interface TypeLoader {
+  load(path: String): Type
+}

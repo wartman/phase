@@ -4,6 +4,7 @@ class ClassDecl {
   new(
     this.name: String,
     this.kind: String,
+    this.params: Array<TypePath>,
     this.superclass: ?TypePath,
     this.interfaces: Array<TypePath>,
     this.fields: Array<Field>,

@@ -1,9 +1,0 @@
-namespace Phase::Language
-
-class TypedStmt {
-  new(
-    this.stmt: StmtDef,
-    this.pos: Position,
-    this.type: Type
-  ) {}
-}

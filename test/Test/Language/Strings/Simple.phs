@@ -1,6 +1,7 @@
 namespace Test::Language::Strings {
   var fooString: String = 'FOO.BAR'
   var arr = fooString.toLowerCase().split('.')
+  'yams and bar' |> print()
 
   ::Expect.that(fooString.toLowerCase(), 'foo.bar')
   ::Expect.that(arr[0], 'foo')

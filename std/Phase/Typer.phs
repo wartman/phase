@@ -1,5 +1,422 @@
 namespace Phase
 
+use Phase::Language::{
+  Token,
+  TokenType,
+  Position,
+  Expr,
+  ExprDef,
+  Literal,
+  Stmt,
+  StmtDef,
+  UseKind,
+  UseTarget,
+  Type,
+  TypePath,
+  CallArgument,
+  FunctionArg,
+  FunctionDecl,
+  Field,
+  FieldAccess,
+  FieldKind,
+  ClassDecl,
+  ClassKind,
+  MatchCase
+}
+
+/// This class does two things: it gathers the types declared
+/// in the current file and it resolves types for all Exprs passed
+/// to it. After using the Typer, type of an Expr can be found on its
+/// `type` property. 
 class Typer {
+  private stmts: Array<Stmt>
+  private types: Map<String, Type>
+  private imports: Map<String, TypePath>
+  private reporter: ErrorReporter
+  private scope: ?Scope = null
+  private ns: Array<String>
+  private typeLoader: TypeLoader
+
+  new(
+    this.stmts: Array<Stmt>,
+    this.reporter: ErrorReporter  
+  ) {}
+
+  /// Only resolve the declared types in this module.
+  typeSurface(): Map<String, Type> {
+    this.types = []
+    for (stmt in this.stmts) {
+      this.typeSurfaceDecl(stmt)
+    }
+    return this.types
+  }
   
+  private typeSurfaceDecl(stmt: Stmt) {
+    var def: StmtDef = stmt.def
+    match (def) {
+      SNamespace(path, decls, attrs) -> {
+        this.ns = path.ns.concat([ path.name ])
+        for (decl in decls) this.typeSurfaceDecl(decl)
+      }
+      SClass(cls) -> {
+        var tp: TypePath = TypePath(
+          ns: ns,
+          name: cls.name,
+          params: cls.params
+        )
+        var type = Type.TClass(cls)
+        this.types.set(tp.toString(), type)
+        if (this.scope != null) {
+          this.scope.declare(cls.name, type)
+        }
+      }
+      SFunction(func) -> {
+        var tp: TypePath = TypePath(
+          ns: ns,
+          name: func.name,
+          params: func.params
+        )
+        var type = Type.TFun(func)
+        this.types.set(tp.toString(), type)
+        if (this.scope != null) {
+          this.scope.declare(func.name, type)
+        }
+      }
+      default -> null // ignore
+    }
+    return types
+  }
+
+  /// Resolve the declared types in this module and type all
+  /// expressions. Note that this modifies the AST tree in place --
+  /// the returned value are the module's declared types.
+  type(): Map<String, Type> {
+    this.scope = Scope()
+    this.typeSurface()
+    for (stmt in this.stmts) {
+      this.typeStmt(stmt)
+    }
+    this.scope = null
+    return this.types
+  }
+
+  typeStmt(stmt: Stmt) {
+    var def: StmtDef = stmt.def
+    match (def) {
+      SExpr(expr) -> this.typeExpr(expr)
+      SUse(path, kind, attributes) -> {
+        // temp: until we have better typing
+        var k: UseKind = kind
+        match (k) {
+          UseNormal -> {
+            var ns = path.copy()
+            var name = ns.pop()
+            this.scope.declare(name, this.resolve(TypePath(
+              ns: ns,
+              name: name,
+              isAbsolute: true
+            )))
+          }
+          UseAlias(alias) -> {
+            // temp: until we have better typing
+            var target: UseTarget = alias
+            var ns = path.copy()
+            var name = ns.pop()
+            var type = TypePath(
+              ns: ns,
+              name: name,
+              isAbsolute: true
+            ) |> this.resolve()
+            match (target) {
+              TargetType(name) -> this.scope.declare(name, type)
+              TargetFunction(name) -> {
+                // todo
+              }
+            }
+          }
+          UseSub(items) -> for (item in items) {
+            // temp: until we have better typing
+            var target: UseTarget = item
+            match (target) {
+              TargetType(name) -> this.scope.declare(name, TypePath(
+                ns: path,
+                name: name,
+                isAbsolute: true
+              ))
+              TargetFunction(name) -> {
+                // todo
+              }
+            }
+          }
+        }
+      }
+      SVar(name, type, init) -> 
+        if (type != null) { 
+          this.scope.declare(name, type)
+          if (init != null) init.type = type 
+        }
+      SGlobal(name) -> null
+      SThrow(expr) -> this.typeExpr(expr) 
+      STry(body, catches) -> this.wrapScope {
+        this.typeStmt(body)
+        for (item in catches) this.typeStmt(item)
+      }
+      SCatch(name, type, body) -> this.wrapScope {
+        if (type != null) this.scope.declare(name, this.resolve(type))
+        this.typeStmt(body)
+      }
+      SWhile(condition, body, inverted) -> this.wrapScope {
+        this.typeExpr(condition)
+        this.typeStmt(body)
+      }
+      SFor(key, value, target, body) -> this.wrapScope {
+        this.typeExpr(target)
+        var type: Type = this.resolve(target.type)
+        // todo
+      }
+      SIf(condition, thenBranch, elseBranch) -> this.wrapScope {
+        this.typeExpr(condition)
+        this.wrapScope { this.typeStmt(thenBranch) }
+        this.wrapScope { this.typeStmt(elseBranch) }
+      }
+      SSwitch(target, cases) -> this.wrapScope {
+        this.typeExpr(target)
+        for (item in cases) this.wrapScope { this.typeStmt(item) }
+      }
+      SBlock(statements) -> this.wrapScope {
+        for (item in statements) this.typeStmt(item)
+      }
+      SReturn(expr) -> this.typeExpr(expr)
+      SFunction(decl) -> this.typeFunction(decl)
+      SClass(cls) -> {
+        this.scope.declare(cls.name, Type.TClass(cls))
+        this.wrapScope {
+          this.scope.declare('static', Type.TClass(cls))
+          this.scope.declare('this', Type.TInstance(cls))
+          for (field in cls.fields) this.typeField(field, cls)
+        }
+      }
+    }
+  }
+
+  typeExpr(expr: Expr) {
+    var def: ExprDef = expr.def
+    match(def) {
+      EAttribute(path, args) -> null // todo
+      EAssign(name, value) -> {
+        this.typeExpr(value)
+        expr.type = value.type
+      }
+      EBinary(left, op, right) -> {
+        this.typeExpr(left)
+        this.typeExpr(right)
+        // todo: unify
+      }
+      EUnary(op, target, isRight) -> {
+        this.typeExpr(target)
+        expr.type = target.type
+      }
+      EIs(left, type) -> {
+        this.typeExpr(left)
+        expr.type = this.resolve(type) // ??
+      }
+      ELogical(left, op, right) -> {
+        this.typeExpr(left)
+        this.typeExpr(right)
+        // @todo: how to represent primitive types?
+        expr.type = this.resolve(TypePath(ns: [], name: 'Bool', isAbsolute: true))
+      }
+      ERange(from, to) -> {
+        // @todo: check that from and to are both numbers
+        this.typeExpr(from)
+        this.typeExpr(to)
+        // @todo: how to represent primitive types?
+        // @todo: this might also be a Float
+        expr.type = this.resolve(TypePath(ns: [], name: 'Int', isAbsolute: true))
+      }
+      ECall(callee, args) -> {
+        this.typeExpr(callee)
+        for (arg in args) {
+          // temp: until typing is better
+          var a: CallArgument = arg
+          match (a) {
+            Positional(e) -> this.typeExpr(e)
+            Named(name, e) -> this.typeExpr(e)
+          }
+        }
+        var type: Type = callee.type
+        match (type) {
+          TFun(func) -> expr.type = this.resolve(func.ret)
+          TClass(cls) -> expr.type = Type.TInstance(cls)
+          TUnknown(path) -> {
+            type = this.resolve(path)
+            match (type) {
+              TFun(func) -> expr.type = this.resolve(func.ret)
+              TClass(cls) -> expr.type = Type.TInstance(cls)
+              default -> null // Do we throw errors here?
+            }    
+          }
+          default -> null // Do we throw errors here?
+        }
+      }
+      EGet(target, field) -> {
+        this.typeExpr(target)
+        var type: Type = target.type
+        // @todo: resolve type from fields
+      }
+      ESet(target, field, value) -> {
+        this.typeExpr(target)
+        this.typeExpr(field)
+        this.typeExpr(value)
+        // @todo: not sure what the type is here
+        expr.type = value.type
+      }
+      EArrayGet(target, field) -> {
+        this.typeExpr(target)
+        this.typeExpr(field)
+        // @todo: this one will be complicated
+      }
+      EArraySet(target, field, value) -> {
+        this.typeExpr(target)
+        this.typeExpr(field)
+        this.typeExpr(value)
+        // @todo: not sure what the type is here
+      }
+      ETernary(condition, thenBranch, elseBranch) -> {
+        this.typeExpr(condition)
+        // @todo: check that `condition` is Bool
+
+        this.typeExpr(thenBranch)
+        this.typeExpr(elseBranch)
+        // @todo: unify
+      }
+      ESuper(method) -> {
+        // @todo: we need our class to push this into our Scope 
+      }
+      EPath(path) -> {
+        expr.type = this.resolve(path)
+      }
+      EThis() -> {
+        var type = this.scope.resolve('this')
+        if (type == null) {
+          // @todo: throw an error
+        }
+        expr.type = type
+      }
+      EStatic() -> {
+        var type = this.scope.resolve('static')
+        if (type == null) {
+          // @todo: throw an error
+        }
+        expr.type = type
+      }
+      EGrouping(target) -> {
+        this.typeExpr(target)
+        expr.type = target.type
+      }
+      ELiteral(value) -> {
+        // temp: until typing is better
+        var t: Literal = value
+        match (t) {
+          LString(str) -> expr.type = this.resolve(TypePath(ns: [], name: 'String', isAbsolute: true))
+          // @todo: We need to handle floats
+          LNumber(value) -> expr.type = this.resolve(TypePath(ns: [], name: 'Int', isAbsolute: true))
+          LTrue() -> expr.type = this.resolve(TypePath(ns: [], name: 'Bool', isAbsolute: true))
+          LFalse() -> expr.type = this.resolve(TypePath(ns: [], name: 'Bool', isAbsolute: true))
+          LNull() -> expr.type = this.resolve(TypePath(ns: [], name: 'Null', isAbsolute: true))
+        }
+      }
+      EArrayLiteral(values, isNative) -> {
+        for (value in values) this.typeExpr(value)
+        var name = if (isNative) '$Array' else 'Array'
+        // @todo: use values to figure out type params?
+        expr.type = this.resolve(TypePath(ns: [], name: name, isAbsolute: true))
+      }
+      EMapLiteral(keys, values, isNative) -> {
+        for (key in keys) this.typeExpr(key)
+        for (value in values) this.typeExpr(value)
+        var name = if (isNative) '$Array' else 'Map'
+        // @todo: use keys and values to figure out type params?
+        expr.type = this.resolve(TypePath(ns: [], name: name, isAbsolute: true))
+      }
+      ELambda(func) -> {
+        this.typeStmt(func)
+        expr.type = Type.TFun(func)
+      }
+      EVariable(name) -> {
+        expr.type = this.scope.resolve(name)
+      }
+      EMatch(target, cases) -> {
+        this.typeExpr(target)
+        for (c in catches) {
+          if (!c.isDefault) this.typeExpr(c.condition)
+          for (s in c.body) this.typeStmt(s)
+        }
+        // @todo: make sure all cases are exhausted?
+        // @todo: what is the expr type here?
+      }
+    }
+  }
+
+  typeFunction(fun: FunctionDecl) {
+    this.scope.declare(decl.name, Type.TFun(decl))
+    this.wrapScope {
+      for (arg in decl.args) {
+        if (arg.type != null) this.scope.declare(arg.name, this.resolve(arg.type))
+      }
+      this.typeStmt(decl.stmt)
+    }
+  }
+
+  typeField(field: Field, cls: ClassDecl) {
+    var kind: FieldKind = field.kind
+    match (kind) {
+      FUse(type) -> null // todo: we'll need to load this type
+      FVar(name, type, initializer) -> {
+        // what to do with the type?
+      }
+      FProp(getter, setter, type) -> {
+        this.typeFunction(getter)
+        this.typeFunction(setter)
+        // what to do with the type?
+      }
+      FFun(fun) -> this.typeFunction(fun)
+    }
+  }
+
+  private resolve(path: ?TypePath): Type {
+    if (path == null) return Type.TAny
+
+    var name = path.toString()
+    var type = this.scope.resolve(name)
+    if (type != null) return type
+    
+    var imported = imports.get(path)
+    if (imported != null) {
+      type = this.scope.resolve(imported.toString())
+    }
+    if (type != null) return type
+
+    if (!path.isAbsolute) {
+      var local: TypePath = TypePath(
+        ns: this.ns.concat(path.ns),
+        name: path.name,
+        isAbsolute: true
+      )
+      return resolve(local)
+    }
+
+    var type = this.typeLoader.load(path.toString())
+    if (type == null) {
+      return Type.TUnknown(path)
+    }
+    return type
+  }
+
+  private wrapScope(cb: Callable) {
+    var prev = this.scope
+    this.scope = this.scope.pushChild()
+    cb()
+    this.scope = prev
+  }
 }

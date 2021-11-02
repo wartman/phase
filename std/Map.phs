@@ -1,0 +1,12 @@
+[::Std::Compiler::Extern()]
+interface Map {
+  set(key: Any, value: Any)
+  get(key: String): ?Any
+  contains(key: String): Bool
+  remove(key: String): Bool
+  keys(): Array
+  copy(): Map
+  toString(): String
+  clear()
+  count(): Int
+}

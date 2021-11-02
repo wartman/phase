@@ -392,9 +392,24 @@ class Parser {
     )
   }
 
+  private parseTypeParams(): Array<TypePath> {
+    var params: Array<TypePath> = []
+    if (this.matches([ TokenType.TokLess ])) {
+      this.ignoreNewlines()
+      params = this.parseList(TokenType.TokComma) {
+        this.ignoreNewlines()
+        return this.parseTypePath()
+      }
+      this.ignoreNewlines()
+      this.consume(TokenType.TokGreater, "Expect a '>' at the end of type parameter list")
+    }
+    return params
+  }
+
   private classDeclaration(attributes: Array<Expr>): Stmt {
     var start: Token = this.previous()
     var name: Token = this.consume(TokenType.TokTypeIdentifier, "Expect a class name. Must start with an uppercase letter.")
+    var params = this.parseTypeParams()
     var superclass: ?TypePath = null
     var interfaces: Array<TypePath> = []
     var fields: Array<Field> = []
@@ -461,6 +476,7 @@ class Parser {
         kind: ClassKind.KindClass,
         superclass: superclass,
         interfaces: interfaces,
+        params: params,
         fields: fields,
         attributes: attributes
       )),
@@ -471,8 +487,9 @@ class Parser {
   private interfaceDeclaration(attributes: Array<Expr>): Stmt {
     var start = this.previous()
     var name = this.consume(TokenType.TokTypeIdentifier, 'Expect a class name. Must start uppercase.')
-    var interfaces: Array<TypePath> = [];
-    var fields: Array<Field> = [];
+    var params = this.parseTypeParams()
+    var interfaces: Array<TypePath> = []
+    var fields: Array<Field> = []
 
     this.ignoreNewlines()
     while (this.matches([ TokenType.TokExtends ]) && !this.isAtEnd()) {
@@ -500,6 +517,7 @@ class Parser {
       stmt: StmtDef.SClass(ClassDecl(
         name: name.lexeme,
         kind: ClassKind.KindInterface,
+        params: params,
         superclass: null,
         interfaces: interfaces,
         fields: fields,
@@ -512,6 +530,7 @@ class Parser {
   private traitDeclaration(attributes: Array<Expr>): Stmt {
     var start = this.previous()
     var name = this.consume(TokenType.TokTypeIdentifier, 'Expect a trait name. Must start uppercase.')
+    var params = this.parseTypeParams()
     var fields: Array<Field> = []
 
     this.consume(TokenType.TokLeftBrace, "Expect '{' before trait body.")
@@ -530,6 +549,7 @@ class Parser {
       stmt: StmtDef.SClass(ClassDecl(
         name: name.lexeme,
         kind: ClassKind.KindTrait,
+        params: params,
         superclass: null,
         interfaces: [],
         fields: fields,
@@ -542,6 +562,7 @@ class Parser {
   private enumDeclaration(attribute: Array<Expr>): Stmt {
     var start = this.previous()
     var enumName = this.consume(TokenType.TokTypeIdentifier, 'Expect an enum name. Must start uppercase.')
+    var params = this.parseTypeParams()
     var fields: Array<Field> = []
 
     if (this.matches([ TokenType.TokAs ])) {
@@ -587,6 +608,7 @@ class Parser {
       return Stmt(
         stmt: StmtDef.SClass(ClassDecl(
           name: enumName.lexeme,
+          params: params,
           kind: ClassKind.KindClass,
           superclass: null,
           interfaces: [],
@@ -621,7 +643,7 @@ class Parser {
       var body = CodeGenerator.generateStmt('{ return ${enumName.lexeme}(
         ${index++},
         "${name.lexeme}",
-        [ ${params.map{ it.name.lexeme }.join(', ')} ]
+        [ ${params.map { it.name.lexeme }.join(', ')} ]
       ) }', enumName.pos, reporter)
 
       this.expectEndOfStatement()
@@ -643,6 +665,7 @@ class Parser {
       stmt: StmtDef.SClass(ClassDecl(
         name: enumName.lexeme,
         kind: ClassKind.KindClass,
+        params: params,
         superclass: TypePath(
           ns: [ 'Std' ],
           name: 'PhaseEnum',
@@ -949,7 +972,7 @@ class Parser {
     this.consume(TokenType.TokRightParen, "Expect ')' after if condition.")
 
     var thenBranch: Stmt = this.statement()
-    var def: StmtDef = thenBranch.def
+    var def: StmtDef = thenBranch.stmt
 
     match (def) {
       SBlock(_) -> null
@@ -962,7 +985,7 @@ class Parser {
     var elseBranch: ?Stmt = null
     if (this.matches([ TokenType.TokElse ])) {
       elseBranch = this.statement()
-      var def: StmtDef = elseBranch.def
+      var def: StmtDef = elseBranch.stmt
       match (def) {
         SBlock(_) -> null
         default -> elseBranch = Stmt(
@@ -1097,7 +1120,7 @@ class Parser {
     this.ignoreNewlines()
 
     return Stmt(
-      stmt: StmtDef.Switch(target, cases),
+      stmt: StmtDef.SSwitch(target, cases),
       pos: start.pos.merge(this.previous().pos)
     )
   }

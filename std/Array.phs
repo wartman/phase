@@ -1,0 +1,24 @@
+// interface Array<T>
+[::Std::Compiler::Extern()]
+interface Array {
+  length: Int
+  insert(index: Int, value): Int 
+  push(value): Int
+  copy(): Array<T>
+  filter(f): Array<T>
+  find(elt): ?Any
+  map(transform): Array<T>
+  contains(item): Bool 
+  indexOf(item): Int
+  remove(item): Bool
+  reverse()
+  pop()
+  shift()
+  sort(f)
+  join(sep: String): String
+  slice(pos: Int, end: Int = null): Array<T>
+  concat(other: Array<T>)
+  splice(pos: Int, len: Int): Array<T>
+  unshift(item)
+  count(): Int
+}

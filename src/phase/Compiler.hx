@@ -8,7 +8,7 @@ using Lambda;
 
 typedef Module = {
   name:String,
-  content:String
+  build:()->String
 };
 
 class Compiler {
@@ -55,7 +55,7 @@ class Compiler {
         var relName = file.withoutExtension();
         modules.push({
           name: relName, 
-          content: compileFile(fullFilePath, server)
+          build: () -> compileFile(fullFilePath, server)
         }); 
       }
     }
@@ -81,13 +81,19 @@ class Compiler {
   function writeModules(modules:Array<Module>) {
     for (module in modules) {
       var name = module.name;
-      var value = module.content;
+      var source = Path.join([ src, name ]).withExtension('phs');
       var dist = Path.join([ dst, name ]).withExtension('php');
       var dir = dist.directory();
       if (!dir.exists()) {
         FileSystem.createDirectory(dir);
       }
-      File.saveContent(dist, value);
+      // if (
+      //   !FileSystem.exists(dist)
+      //   || (FileSystem.stat(source).mtime.getTime() > FileSystem.stat(dist).mtime.getTime())
+      // ) {
+        var value = module.build();
+        File.saveContent(dist, value);
+      // }
     }
   }
 

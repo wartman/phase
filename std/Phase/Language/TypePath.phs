@@ -8,4 +8,18 @@ class TypePath {
     this.isAbsolute: Bool = false,
     this.isNullable: Bool = false
   ) {}
+
+  toString() {
+    var path = this.ns.concat([ this.name ]).join('::')
+    if (this.isAbsolute) {
+      path = '::${path}' 
+    }
+    if (this.isNullable) {
+      path = '?${path}'
+    }
+    if (this.params != null && this.params.length > 0) {
+      return '${path}<${ this.params.map { it.toString() }.join(', ') }>'
+    }
+    return path
+  }
 }

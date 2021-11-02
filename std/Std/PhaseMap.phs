@@ -1,0 +1,82 @@
+namespace Std
+
+use ArrayAccess 
+use ArrayIterator
+use Countable
+use IteratorAggregate
+use Traversable
+use InvalidArgumentException
+
+// class PhaseMap<T, V>
+class PhaseMap
+  implements ArrayAccess 
+  implements Countable
+  implements IteratorAggregate
+  implements Traversable
+{
+  private data: $array
+
+  new (this.data: $array) {}
+
+  set(key: Any, value: Any) {
+    this.data[key] = value
+  }
+
+  get(key: String): Any {
+    return if (this.data[key] |> isset()) this.data[key] else null
+  }
+
+  contains(key: String): Bool { this.data[key] |> isset() }
+
+  remove(key: String): Bool {
+    if (this.data |> array_key_exists(key)) {
+      this.data[key] |> unset()
+      return true
+    }
+    return false
+  }
+
+  keys(): Array {
+    return this.data |> array_keys() |> PhaseArray()
+  }
+
+  copy() { clone(this) }
+
+  toString() { this.__toString() }
+
+  __toString() { this.data |> implode(', ') }
+
+  clear() {
+    this.data = $[]
+  }
+  
+  offsetGet(offset) {
+    try {
+      return this.data[offset]
+    } catch (e: ::Throwable) {
+      return null
+    }
+  }
+
+  offsetExists(offset) { this.data[offset] |> isset() }
+
+  offsetSet(offset, value) {
+    if (offset == null) {
+      throw InvalidArgumentException()
+    } else {
+      this.set(offset, value)
+    }
+  }
+
+  offsetUnset(offset) {
+    if (this.data[offset] |> isset()) {
+      this.data[offset] |> unset()
+    }
+  }
+
+  getIterator(): Traversable { ArrayIterator(this.data) }
+
+  count(): Int { this.data |> count() }
+
+  unwrap() { this.data }
+}

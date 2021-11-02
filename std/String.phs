@@ -1,0 +1,7 @@
+[::Std::Compiler::Extern()]
+interface String {
+  toLowerCase(): String
+  toUpperCase(): String
+  split(sep: String): Array<String>
+  // etc
+}

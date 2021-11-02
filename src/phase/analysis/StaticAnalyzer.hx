@@ -4,46 +4,47 @@ import phase.analysis.Type;
 import Type as HxType;
 
 using Lambda;
+using phase.analysis.TypeTools;
 
 class StaticAnalyzer 
   implements ExprVisitor<Void> 
   implements StmtVisitor<Void>
 {
   // @todo: This should NOT be hard-coded like this 
-  public static final stringType:ClassType = {
-    namespace: [],
-    superclass: null,
-    interfaces: [],
-    name: 'String',
-    fields: [
-      { 
-        name: 'toLowerCase', 
-        kind: TMethod({
-          name: 'toLowerCase',
-          args: [],
-          ret: TPath({ namespace: [], name: 'String' }) 
-        })
-      },
-      { 
-        name: 'toUpperCase', 
-        kind: TMethod({
-          name: 'toUpperCase',
-          args: [],
-          ret: TPath({ namespace: [], name: 'String' }) 
-        })
-      },
-      {
-        name: 'split',
-        kind: TMethod({
-          name: 'split',
-          args: [
-            { name: 'sep', type: TPath({ namespace: [], name: 'String' }) }
-          ],
-          ret: TPath({ namespace: [], name: 'Array' })
-        })
-      }
-    ]
-  };
+  // public static final stringType:ClassType = {
+  //   namespace: [],
+  //   superclass: null,
+  //   interfaces: [],
+  //   name: 'String',
+  //   fields: [
+  //     { 
+  //       name: 'toLowerCase', 
+  //       kind: TMethod({
+  //         name: 'toLowerCase',
+  //         args: [],
+  //         ret: TPath({ namespace: [], name: 'String' }) 
+  //       })
+  //     },
+  //     { 
+  //       name: 'toUpperCase', 
+  //       kind: TMethod({
+  //         name: 'toUpperCase',
+  //         args: [],
+  //         ret: TPath({ namespace: [], name: 'String' }) 
+  //       })
+  //     },
+  //     {
+  //       name: 'split',
+  //       kind: TMethod({
+  //         name: 'split',
+  //         args: [
+  //           { name: 'sep', type: TPath({ namespace: [], name: 'String' }) }
+  //         ],
+  //         ret: TPath({ namespace: [], name: 'Array' })
+  //       })
+  //     }
+  //   ]
+  // };
 
   final stmts:Array<Stmt>;
   final reporter:ErrorReporter;
@@ -212,7 +213,9 @@ class StaticAnalyzer
       }
     });
 
-    scope.declare(stmt.name.lexeme, TClass(cls));
+    var type = TClass(cls);
+    scope.declare(stmt.name.lexeme, type);
+    typedDecls.set(stmt.name.lexeme, type);
   }
 
   function extractClassFields(stmt:Stmt.Class):Array<Field> {
@@ -404,7 +407,8 @@ class StaticAnalyzer
         var v:Expr.Variable = cast expr.name;
         var name = v.name.lexeme;
         if (name == 'class') {
-          TInstance(stringType);
+          TPath({ namespace: [], name: 'String' });
+          // TInstance(stringType);
         } else switch type {
           // Todo: split instance and class fields
           case TClass(cls) | TInstance(cls):
@@ -460,11 +464,12 @@ class StaticAnalyzer
 
   public function visitLiteralExpr(expr:Expr.Literal):Void {
     if (Std.isOfType(expr.value, Int)) {
-      setType(expr, TPath({ namespace: [], name: 'Int' }));
+      setType(expr, server.locateType('Int'));
     } else if (Std.isOfType(expr.value, Bool)) {
-      setType(expr, TPath({ namespace: [], name: 'Bool' }));
+      setType(expr, server.locateType('Bool'));
     } else {
-      setType(expr, TInstance(stringType));
+      setType(expr, server.locateType('String'));
+      // setType(expr, TInstance(stringType));
     }
   }
 
@@ -530,8 +535,14 @@ class StaticAnalyzer
 
   function setType(expr:Expr, type:Type) {
     typedExprs.set(expr, switch type {
-      case TPath({ namespace: [], name: 'String' }): 
-        TInstance(stringType);
+      case TPath(path):
+        try {
+          server.locateType(type.getTypeName());
+        } catch (e) {
+          TUnknown;
+        }
+      // case TPath({ namespace: [], name: 'String' }): 
+      //   TInstance(stringType);
       default:
         type;
     });
@@ -541,9 +552,10 @@ class StaticAnalyzer
     var type = typedExprs.get(expr);
     if (type == null) return TUnknown;
     return switch type {
-      case TPath({ namespace: [], name: 'String' }): 
-        TInstance(stringType);
-      // todo: resolve other types  
+      case TPath(path):
+        server.locateType(type.getTypeName());
+      // case TPath({ namespace: [], name: 'String' }): 
+      //   TInstance(stringType);
       default: 
         type;
     }

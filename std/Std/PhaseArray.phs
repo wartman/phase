@@ -4,28 +4,28 @@ use ArrayAccess
 use ArrayIterator
 use Countable
 use IteratorAggregate
-use Traversable 
+use Traversable
 
-class PhaseArray 
+class PhaseArray
   implements ArrayAccess 
   implements Countable
   implements IteratorAggregate
   implements Traversable
 {
-  private value: $array
+  private data: $array
 
-  new(this.value: $array) {}
+  new(this.data: $array) {}
 
   length: Int { 
-    get { count(this.value) }
+    get { count(this.data) }
   }
 
-  at(index: Int) { this.value[index] }
+  at(index: Int) { this.data[index] }
   
-  insert(index: Int, value): Int { this.value[index] = value }
+  insert(index: Int, value): Int { this.data[index] = value }
 
   push(value): Int {
-    this.value[] = value
+    this.data[] = value
     return this.length
   }
 
@@ -33,7 +33,7 @@ class PhaseArray
 
   filter(f): PhaseArray {
     var out = []
-    for (item in this.value) {
+    for (item in this.data) {
       if (f(item)) {
         out.push(item)
       }
@@ -41,9 +41,16 @@ class PhaseArray
     return out
   }
 
+  find(elt): ?Any {
+    for (item in this.data) {
+      if (elt(item)) return item
+    }
+    return null
+  }
+
   map(transform): PhaseArray {
     var out = []
-    for (item in this.value) {
+    for (item in this.data) {
       value |> transform() |> out.push()
     }
     return out
@@ -54,15 +61,15 @@ class PhaseArray
   }
 
   indexOf(item): Int {
-    var index = array_search(item, this.value, true)
+    var index = array_search(item, this.data, true)
     return if (index == false) -1 else index
   }
 
   remove(item): Bool {
     var removed = false
     for (index in 0..this.length) {
-      if (this.value[index] == item) {
-        array_splice(this.value, index, 1)
+      if (this.data[index] == item) {
+        array_splice(this.data, index, 1)
         removed = true
         break
       }
@@ -71,23 +78,23 @@ class PhaseArray
   }
 
   reverse() {
-    this.value = array_reverse(this.value);
+    this.data = array_reverse(this.data);
   }
 
   pop() {
-    return array_pop(this.value)
+    return array_pop(this.data)
   }
 
   shift() {
-    return array_shift(this.value)
+    return array_shift(this.data)
   }
 
   sort(f) {
-    usort(this.value, f)
+    usort(this.data, f)
   }
 
   join(sep: String): String {
-    return this.value |> implode(sep)
+    return this.data |> implode(sep)
   }
 
   slice(pos: Int, end: Int = null): PhaseArray {
@@ -98,7 +105,7 @@ class PhaseArray
       pos = 0
     }
     if (end == null) {
-      return array_slice(this.value, pos)
+      return array_slice(this.data, pos)
     } else {
       if (end <= 0) {
         end = end + this.length
@@ -106,49 +113,49 @@ class PhaseArray
       if (end <= pos) {
         return []
       } else {
-        return array_slice(this.value, pos, end - pos)
+        return array_slice(this.data, pos, end - pos)
       }
     }
   }
 
   concat(other: PhaseArray) {
-    return PhaseArray(array_merge(this.value, other.unwrap()))
+    return PhaseArray(array_merge(this.data, other.unwrap()))
   }
   
   splice(pos: Int, len: Int): PhaseArray {
     if (len < 0) return [];
-    return array_splice(this.value, pos, len)
+    return array_splice(this.data, pos, len)
   }
 
-  unshift(item) { array_unshift(this.value, item) }
+  unshift(item) { array_unshift(this.data, item) }
 
   offsetGet(offset) {
     try {
-      return this.value[offset]
+      return this.data[offset]
     } catch (e: ::Throwable) {
       return null
     }
   }
 
-  offsetExists(offset) { this.value[offset] |> isset() }
+  offsetExists(offset) { this.data[offset] |> isset() }
 
   offsetSet(offset, value) {
     if (offset == null) {
-      this.value[] = value
+      this.data[] = value
     } else {
       this.insert(offset, value)
     }
   }
 
   offsetUnset(offset) {
-    if (this.value[offset] |> isset()) {
-      this.value[offset] |> unset()
+    if (this.data[offset] |> isset()) {
+      this.data[offset] |> unset()
     }
   }
 
-  getIterator(): Traversable { ArrayIterator(this.value) }
+  getIterator(): Traversable { ArrayIterator(this.data) }
 
   count(): Int { this.length }
 
-  unwrap() { this.value }
+  unwrap() { this.data }
 }

@@ -3,6 +3,7 @@ namespace Phase::Language
 class Expr {
   new(
     this.expr: ExprDef,
-    this.pos: Position
+    this.pos: Position,
+    this.type: ?Type = null
   ) {}
 }

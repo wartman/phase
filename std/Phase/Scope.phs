@@ -1,0 +1,42 @@
+namespace Phase
+
+use Phase::Language::{ Type }
+
+class Scope {
+  new(
+    this.values: Map<String, Type> = [],
+    this.parent: ?Scope,
+    this.children: Array<Scope> = []
+  ) {}
+
+  declare(name: String, type: Type) {
+    this.values[name] = type
+  }
+
+  isDeclared(name: String): Bool {
+    if (!this.values[name] |> isset() && this.parent != null) {
+      return this.parent.isDeclared(name)
+    }
+    return this.values[name] |> isset()
+  }
+
+  resolve(name: String): Type {
+    if (this.values[name] |> isset()) {
+      return this.values[name]
+    }
+    if (this.parent != null) {
+      return this.parent[name]
+    }
+    return Type.TUnknown()
+  }
+
+  addChild(child: Scope) {
+    this.children.push(child)
+  }
+
+  pushChild(): Scope {
+    var child = Scope(this)
+    this.addChild(child)
+    return child
+  }
+}

@@ -18,9 +18,7 @@ enum Type {
   /// A function type.
   TFun(func: FunctionDecl)
 
-  /// A class.
-  TClass(cls: ClassDecl)
-
-  /// An instance of a class.
+  /// An instance of a class. Note: this will also be used
+  /// for static methods.
   TInstance(cls: ClassDecl)
 }

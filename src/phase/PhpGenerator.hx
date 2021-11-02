@@ -44,6 +44,7 @@ class PhpGenerator
     'Int' => 'int',
     // 'Array' => 'array',
     'Array' => '\\Std\\PhaseArray',
+    'Map' => '\\Std\\PhaseMap',
     'Callable' => 'callable',
     'Any' => 'mixed',
     'Scalar' => 'scalar'
@@ -801,7 +802,8 @@ class PhpGenerator
   public function visitGetExpr(expr:Expr.Get):String {
     var objectType = context.typeOf(expr.object);
     switch objectType {
-      case TInstance(StaticAnalyzer.stringType):
+      case TInstance(cls) | TClass(cls) if (cls.name == 'String'):
+      // case TInstance(StaticAnalyzer.stringType):
         // @todo: this is just a proof of concept -- we need a 
         //        better solution.
         var name = getProperty(expr.name, false);
