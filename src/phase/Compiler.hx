@@ -66,11 +66,14 @@ class Compiler {
   function compileFile(path:String, server:Server) {
     var source = load(path);
     var reporter = reporterFactory(source);
+    trace('scanning $path');
     var scanner = new Scanner(source, path, reporter);
+    trace('parsing $path');
     var parser = new Parser(scanner.scan(), reporter);
+    trace('generating $path');
     var generator = new PhpGenerator(parser.parse(), reporter, server);
-    
     var data = generator.generate();
+    trace('done');
     if (reporter.hadError()) {
       throw new PhpGenerator.GeneratorError();
       return '';

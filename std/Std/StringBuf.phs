@@ -1,0 +1,23 @@
+namespace Std
+
+class StringBuf {
+  value: $string
+
+  length: Int {
+    get { this.value |> strlen() }
+  }
+
+  new() {
+    this.value = ''
+  }
+
+  add(value: ?String): StringBuf {
+    if (value == null) return this
+    this.value = "${this.value}${value}" // todo: just until I get string concat right
+    return this
+  }
+
+  toString(): String { this.__toString() }
+
+  __toString(): String { this.value }
+}

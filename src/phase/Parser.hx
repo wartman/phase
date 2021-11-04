@@ -1,8 +1,10 @@
 package phase;
 
 import phase.Stmt.FunctionArg;
+
 using Lambda;
 
+// @todo: this is the place slowdowns are happening.
 class Parser {
 
   static final continuationTokens:Array<TokenType> = [

@@ -6,6 +6,7 @@ class Field {
     this.kind: FieldKind,
     this.type: ?TypePath,
     this.access: Array<FieldAccess>,
-    this.attributes: Array<Expr>
+    this.attributes: Array<Expr>,
+    this.pos: Position
   ) {}
 }

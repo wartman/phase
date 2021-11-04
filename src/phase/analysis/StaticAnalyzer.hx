@@ -60,6 +60,41 @@ class StaticAnalyzer
     this.reporter = reporter;
   }
 
+  public function analyzeSurface() {
+    analyze();
+    return typedDecls;
+  }
+
+  // function analyzeSurfaceDecl(decl:Stmt, ns:Array<String>) {
+  //   switch HxType.getClass(decl) {
+  //     case Stmt.Namespace:
+  //       var namespace:Stmt.Namespace = cast decl;
+  //       var ns = namespace.path.map(s -> s.lexeme);
+  //       for (decl in namespace.decls) analyzeSurfaceDecl(decl, ns);
+  //     case Stmt.Function:
+  //       var fn:Stmt.Function = cast decl;
+  //       var fun = TFun({
+  //         name: fn.name.lexeme,
+  //         args: [],
+  //         ret: typeFromTypeExpr(fn.ret)
+  //       });
+  //       typedDecls.set(ns.concat([ fn.name.lexeme ]).join('::'), fun);
+  //     case Stmt.Class:
+  //       var cls:Stmt.Class = cast decl;
+  //       var type = TClass({
+  //         namespace: ns,
+  //         superclass: cls.superclass == null 
+  //           ? null
+  //           : typeFromTypeExpr(cls.superclass),
+  //         interfaces: cls.interfaces.map(typeFromTypeExpr),
+  //         name: cls.name.lexeme,
+  //         fields: extractClassFields(cls)
+  //       });
+  //       typedDecls.set(ns.concat([ cls.name.lexeme ]).join('::'), type);
+  //     default:
+  //   }
+  // }
+
   public function analyze() {
     scope = new Scope();
     imports = new Map();
@@ -196,24 +231,33 @@ class StaticAnalyzer
     if (stmt.superclass != null) stmt.superclass.accept(this);
     for (i in stmt.interfaces) i.accept(this);
 
-    var cls:ClassType = {
-      namespace: [],
-      name: stmt.name.lexeme,
-      superclass: stmt.superclass != null 
-        ? typedExprs.get(stmt.superclass)
-        : null,
-      interfaces: stmt.interfaces.map(i -> typedExprs.get(i)),
-      fields: extractClassFields(stmt)
-    };
-    wrapScope(() -> {
-      scope.declare('this', TInstance(cls));
-      scope.declare('static', TClass(cls));
-      for (field in stmt.fields) {
-        field.accept(this);
-      }
-    });
+    var type = if (!typedDecls.exists(stmt.name.lexeme)) {
+      var cls:ClassType = {
+        namespace: [],
+        name: stmt.name.lexeme,
+        superclass: stmt.superclass != null 
+          ? typedExprs.get(stmt.superclass)
+          : null,
+        interfaces: stmt.interfaces.map(i -> typedExprs.get(i)),
+        fields: extractClassFields(stmt)
+      };
+      TClass(cls);
+    } else {
+      typedDecls.get(stmt.name.lexeme);
+    }
 
-    var type = TClass(cls);
+    switch type {
+      case TClass(cls):  
+        wrapScope(() -> {
+          scope.declare('this', TInstance(cls));
+          scope.declare('static', TClass(cls));
+          for (field in stmt.fields) {
+            field.accept(this);
+          }
+        });
+      default: throw "wtf";
+    }
+    
     scope.declare(stmt.name.lexeme, type);
     typedDecls.set(stmt.name.lexeme, type);
   }
@@ -305,7 +349,7 @@ class StaticAnalyzer
   public function visitForStmt(stmt:Stmt.For) {
     wrapScope(() -> {
       stmt.target.accept(this);
-      scope.declare(stmt.key.lexeme, resolveType(stmt.target));
+      // Todo: we have to find the types of the thing being iterated over.
       stmt.body.accept(this);
     });
   }
@@ -520,7 +564,7 @@ class StaticAnalyzer
     if (!expr.absolute) {
       if (namespace.length == 0) {
         if (imports.exists(name)) return imports.get(name);
-        switch scope.resolve(name) {
+        if (scope != null) switch scope.resolve(name) {
           case TUnknown:
           case other: return other;
         }

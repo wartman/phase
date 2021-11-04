@@ -25,7 +25,7 @@ enum StmtDef {
   )
   SCatch(
     name: String,
-    type: TypePath,
+    type: ?TypePath,
     body: Stmt
   )
   SWhile(
@@ -42,7 +42,7 @@ enum StmtDef {
   SIf(
     condition: Expr,
     thenBranch: Stmt,
-    elseBranch: Stmt
+    elseBranch: ?Stmt
   )
   SSwitch(
     target: Expr,
@@ -51,7 +51,7 @@ enum StmtDef {
   SBlock(
     statements: Array<Stmt>
   )
-  SReturn(value: Expr)
-  SFunction(decl:FunctionDecl)
-  SClass(cls:ClassDecl)
+  SReturn(value: ?Expr)
+  SFunction(decl: FunctionDecl)
+  SClass(cls: ClassDecl)
 }

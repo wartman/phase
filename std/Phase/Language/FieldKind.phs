@@ -5,13 +5,13 @@ enum FieldKind {
   FUse(type: TypePath)
   FVar(
     name: String,
-    type: TypePath,
-    initializer: Expr
+    type: ?TypePath,
+    initializer: ?Expr
   )
   FProp(
     getter: ?FunctionDecl,
     setter: ?FunctionDecl,
-    type: TypePath
+    type: ?TypePath
   )
   FFun(fun: FunctionDecl)
 }

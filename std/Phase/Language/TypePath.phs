@@ -4,10 +4,12 @@ class TypePath {
   new(
     this.ns: Array<String>,
     this.name: String,
-    this.params: Array<TypePath>,
+    this.params: ?Array<TypePath> = null,
     this.isAbsolute: Bool = false,
     this.isNullable: Bool = false
-  ) {}
+  ) {
+    if (this.params == null) this.params = []
+  }
 
   toString() {
     var path = this.ns.concat([ this.name ]).join('::')

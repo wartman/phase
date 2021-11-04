@@ -1,0 +1,10 @@
+namespace Phase::Generator
+
+enum PhpGeneratorMode as String {
+  GeneratingRoot
+  GeneratingClass
+  GeneratingInterface
+  GeneratingTrait
+  GeneratingClosure
+  GeneratingFunction
+}

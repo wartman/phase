@@ -61,7 +61,7 @@ namespace Phase {
       return $statements;
     }
 
-    public function declaration(\Std\PhaseArray $attributes = null):Stmt
+    public function declaration(?\Std\PhaseArray $attributes = null):Stmt
     {
       if ($attributes == null)
       {
@@ -210,6 +210,7 @@ namespace Phase {
       {
         throw $this->error($this->previous(), "`use` is not allowed outside a namespace");
       }
+      $start = $this->previous();
       $kind = UseKind::UseNormal();
       $absolute = false;
       $path = new \Std\PhaseArray([]);
@@ -239,12 +240,12 @@ namespace Phase {
           {
             if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftBrace])))
             {
-              $kind = UseKind::UseSub($this->parseList(TokComma, function ($it = null)
+              $kind = UseKind::UseSub($this->parseList(TokenType::TokComma, function ($it = null)
               {
                 if ($this->matches(new \Std\PhaseArray([TokenType::TokTypeIdentifier, TokenType::TokIdentifier])))
                 {
                   $tok = $this->previous();
-                  return $tok->type == TokenType::TokIdentifier ? UseTarget::TargetFunction($tok) : UseTarget::TargetType($tok);
+                  return $tok->type == TokenType::TokIdentifier ? UseTarget::TargetFunction($tok->lexeme) : UseTarget::TargetType($tok->lexeme);
                 }
                 else
                 {
@@ -289,7 +290,7 @@ namespace Phase {
         }
       }
       $this->expectEndOfStatement();
-      return new Stmt(stmt: StmtDef::SUse($path, $absolute, $kind, attribute), pos: start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SUse(path: $path, kind: $kind, attributes: $attributes), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function varDeclaration()
@@ -362,7 +363,7 @@ namespace Phase {
           {
             $expr = $this->expression();
           }
-          $args->push(new FunctionArg(name: $name, type: $type, expr: $expr, isInit: $isInit));
+          $args->push(new FunctionArg(name: $name->lexeme, type: $type, expr: $expr, isInit: $isInit));
         }
         while ($this->matches(new \Std\PhaseArray([TokenType::TokComma])));
       }
@@ -381,7 +382,7 @@ namespace Phase {
       }
       if (!$this->check(TokenType::TokNewline) && !$this->check(TokenType::TokReturn))
       {
-        $body = new \Std\PhaseArray([new Stmt(stmt: StmtDef::SReturn(expression()), pos: $start->pos->merge($this->previous()->pos))]);
+        $body = new \Std\PhaseArray([new Stmt(stmt: StmtDef::SReturn($this->expression()), pos: $start->pos->merge($this->previous()->pos))]);
         $this->ignoreNewlines();
         $this->consume(TokenType::TokRightBrace, "Inline functions must contain only one expression.");
       }
@@ -400,10 +401,28 @@ namespace Phase {
       return new Stmt(stmt: StmtDef::SFunction($def), pos: $start->pos->merge($this->previous()->pos));
     }
 
+    protected function parseTypeParams():\Std\PhaseArray
+    {
+      $params = new \Std\PhaseArray([]);
+      if ($this->matches(new \Std\PhaseArray([TokenType::TokLess])))
+      {
+        $this->ignoreNewlines();
+        $params = $this->parseList(TokenType::TokComma, function ($it = null)
+        {
+          $this->ignoreNewlines();
+          return $this->parseTypePath();
+        });
+        $this->ignoreNewlines();
+        $this->consume(TokenType::TokGreater, "Expect a '>' at the end of type parameter list");
+      }
+      return $params;
+    }
+
     protected function classDeclaration(\Std\PhaseArray $attributes):Stmt
     {
       $start = $this->previous();
       $name = $this->consume(TokenType::TokTypeIdentifier, "Expect a class name. Must start with an uppercase letter.");
+      $params = $this->parseTypeParams();
       $superclass = null;
       $interfaces = new \Std\PhaseArray([]);
       $fields = new \Std\PhaseArray([]);
@@ -439,7 +458,7 @@ namespace Phase {
           {
             if ($a->isInit == true && !(isset($fields[$a->name])))
             {
-              $fields->push(new Field(name: $a->name, kind: FieldKind::FVar(name: $a->name, type: $a->type, initializer: null), type: $a->type, access: new \Std\PhaseArray([FieldAccess::APublic]), attributes: new \Std\PhaseArray([])));
+              $fields->push(new Field(name: $a->name, kind: FieldKind::FVar(name: $a->name, type: $a->type, initializer: null), type: $a->type, access: new \Std\PhaseArray([FieldAccess::APublic]), attributes: new \Std\PhaseArray([]), pos: $this->previous()->pos));
             }
           }
         }
@@ -451,13 +470,14 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightBrace, "Expect '}' at end of class body");
       $this->ignoreNewlines();
-      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindClass, superclass: $superclass, interfaces: $interfaces, fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindClass, superclass: $superclass, interfaces: $interfaces, params: $params, fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function interfaceDeclaration(\Std\PhaseArray $attributes):Stmt
     {
       $start = $this->previous();
       $name = $this->consume(TokenType::TokTypeIdentifier, "Expect a class name. Must start uppercase.");
+      $params = $this->parseTypeParams();
       $interfaces = new \Std\PhaseArray([]);
       $fields = new \Std\PhaseArray([]);
       $this->ignoreNewlines();
@@ -481,13 +501,14 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightBrace, "Expect '}' at end of interface body");
       $this->ignoreNewlines();
-      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindInterface, superclass: null, interfaces: $interfaces, fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindInterface, params: $params, superclass: null, interfaces: $interfaces, fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function traitDeclaration(\Std\PhaseArray $attributes):Stmt
     {
       $start = $this->previous();
       $name = $this->consume(TokenType::TokTypeIdentifier, "Expect a trait name. Must start uppercase.");
+      $params = $this->parseTypeParams();
       $fields = new \Std\PhaseArray([]);
       $this->consume(TokenType::TokLeftBrace, "Expect '{' before trait body.");
       $this->ignoreNewlines();
@@ -499,13 +520,14 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightBrace, "Expect '}' at end of trait body");
       $this->ignoreNewlines();
-      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindTrait, superclass: null, interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $name->lexeme, kind: ClassKind::KindTrait, params: $params, superclass: null, interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
     }
 
-    protected function enumDeclaration(\Std\PhaseArray $attribute):Stmt
+    protected function enumDeclaration(\Std\PhaseArray $attributes):Stmt
     {
       $start = $this->previous();
       $enumName = $this->consume(TokenType::TokTypeIdentifier, "Expect an enum name. Must start uppercase.");
+      $params = $this->parseTypeParams();
       $fields = new \Std\PhaseArray([]);
       if ($this->matches(new \Std\PhaseArray([TokenType::TokAs])))
       {
@@ -544,7 +566,7 @@ namespace Phase {
         $this->ignoreNewlines();
         $this->consume(TokenType::TokRightBrace, "Expect '}' at end of enum body");
         $this->ignoreNewlines();
-        return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $enumName->lexeme, kind: ClassKind::KindClass, superclass: null, interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: attributes)), pos: $start->pos->merge($this->previous()->pos));
+        return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $enumName->lexeme, params: $params, kind: ClassKind::KindClass, superclass: null, interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
       }
       $this->consume(TokenType::TokLeftBrace, "Expect '{' before enum body.");
       $this->ignoreNewlines();
@@ -574,14 +596,15 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightBrace, "Expect '}' at end of enum body");
       $this->ignoreNewlines();
-      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $enumName->lexeme, kind: ClassKind::KindClass, superclass: new TypePath(ns: new \Std\PhaseArray(["Std"]), name: "PhaseEnum", params: new \Std\PhaseArray([]), isAbsolute: true, isNullable: false), interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: attributes)), pos: $start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $enumName->lexeme, kind: ClassKind::KindClass, params: $params, superclass: new TypePath(ns: new \Std\PhaseArray(["Std"]), name: "PhaseEnum", params: new \Std\PhaseArray([]), isAbsolute: true, isNullable: false), interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function fieldDeclaration():Field
     {
+      $start = $this->previous();
       if ($this->matches(new \Std\PhaseArray([TokenType::TokUse])))
       {
-        $out = new Field(name: "", kind: FieldKind::FUse(path: $this->parseTypePath(false)), access: new \Std\PhaseArray([]), attributes: new \Std\PhaseArray([]));
+        $out = new Field(name: "", kind: FieldKind::FUse(path: $this->parseTypePath(false)), access: new \Std\PhaseArray([]), attributes: new \Std\PhaseArray([]), pos: $start->pos->merge($this->previous()->pos));
         $this->expectEndOfStatement();
         return $out;
       }
@@ -596,7 +619,7 @@ namespace Phase {
         $this->consume(TokenType::TokEqual, "Expect assignment for consts");
         $this->ignoreNewlines();
         $value = $this->expression();
-        $out = new Field(name: $name->lexeme, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $value), access: new \Std\PhaseArray([AConst]), attributes: new \Std\PhaseArray([]));
+        $out = new Field(name: $name->lexeme, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $value), access: new \Std\PhaseArray([AConst]), attributes: new \Std\PhaseArray([]), pos: $start->pos->merge($this->previous()->pos));
         $this->expectEndOfStatement();
         return $out;
       }
@@ -648,7 +671,7 @@ namespace Phase {
       if ($this->matches(new \Std\PhaseArray([TokenType::TokNewline])))
       {
         $this->ignoreNewlines();
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: null), attributes: $attributes);
+        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: null), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftBrace])))
       {
@@ -687,7 +710,7 @@ namespace Phase {
         }
         $this->ignoreNewlines();
         $this->consume(TokenType::TokRightBrace, "Expected a `}`");
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FProp(getter: $getter, setter: $setter, type: $type), attributes: $attributes);
+        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FProp(getter: $getter, setter: $setter, type: $type), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       if ($this->matches(new \Std\PhaseArray([TokenType::TokEqual])))
       {
@@ -698,7 +721,7 @@ namespace Phase {
         $this->ignoreNewlines();
         $expr = $this->expression();
         $this->expectEndOfStatement();
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $expr), attributes: $attributes);
+        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $expr), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       $this->consume(TokenType::TokLeftParen, "Expect '(' after function name.");
       $args = $this->functionArgs($name->lexeme == "new");
@@ -718,7 +741,7 @@ namespace Phase {
         $body = $this->functionBody();
         $this->expectEndOfStatement();
       }
-      return new Field(name: $name->lexeme, access: $access, type: $type, kind: FieldKind::FFun(new FunctionDecl(name: $name->lexeme, args: $args, body: $body, ret: $type, attributes: new \Std\PhaseArray([]))), attributes: $attributes);
+      return new Field(name: $name->lexeme, access: $access, type: $type, kind: FieldKind::FFun(new FunctionDecl(name: $name->lexeme, args: $args, body: $body, ret: $type, attributes: new \Std\PhaseArray([]))), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function attributeList():\Std\PhaseArray
@@ -757,7 +780,7 @@ namespace Phase {
     protected function expressionStatement()
     {
       $expr = $this->expression();
-      $this->expressionStatement();
+      $this->expectEndOfStatement();
       return new Stmt(stmt: StmtDef::SExpr($expr), pos: $expr->pos);
     }
 
@@ -791,27 +814,27 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightParen, "Expect ')' after if condition.");
       $thenBranch = $this->statement();
-      $def = $thenBranch->def;
+      $def = $thenBranch->stmt;
       $__matcher_3 = $def;
       if ($__matcher_3->tag == "SBlock") { 
         $_ = $__matcher_3->params[0];
         null;
       }
       else {
-        $thenBranch = new Stmt(stmt: StmtDef::SBlock($thenBranch), pos: $thenBranch->pos);
+        $thenBranch = new Stmt(stmt: StmtDef::SBlock(new \Std\PhaseArray([$thenBranch])), pos: $thenBranch->pos);
       };
       $elseBranch = null;
       if ($this->matches(new \Std\PhaseArray([TokenType::TokElse])))
       {
         $elseBranch = $this->statement();
-        $def = $elseBranch->def;
+        $def = $elseBranch->stmt;
         $__matcher_4 = $def;
         if ($__matcher_4->tag == "SBlock") { 
           $_ = $__matcher_4->params[0];
           null;
         }
         else {
-          $elseBranch = new Stmt(stmt: StmtDef::SBlock($elseBranch), pos: $elseBranch->pos);
+          $elseBranch = new Stmt(stmt: StmtDef::SBlock(new \Std\PhaseArray([$elseBranch])), pos: $elseBranch->pos);
         };
       }
       return new Stmt(stmt: StmtDef::SIf($condition, $thenBranch, $elseBranch), pos: $start->pos->merge($this->previous()->pos));
@@ -896,7 +919,7 @@ namespace Phase {
       $this->ignoreNewlines();
       $this->consume(TokenType::TokRightBrace, "Expect a '}' at the end of a switch statement");
       $this->ignoreNewlines();
-      return new Stmt(stmt: StmtDef::Switch($target, $cases), pos: $start->pos->merge($this->previous()->pos));
+      return new Stmt(stmt: StmtDef::SSwitch($target, $cases), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function throwStatement():Stmt
@@ -964,7 +987,7 @@ namespace Phase {
         $this->ignoreNewlines();
         $isDefault = false;
         $condition = null;
-        if ($this->matches(new \Std\PhaseArray([TokDefault])))
+        if ($this->matches(new \Std\PhaseArray([TokenType::TokDefault])))
         {
           $isDefault = true;
         }
@@ -1229,7 +1252,7 @@ namespace Phase {
                 {
                   $this->ignoreNewlines();
                   $index = $this->expression();
-                  $tok = $this->consume(TokRightBracket, "Expect ']' after expression");
+                  $tok = $this->consume(TokenType::TokRightBracket, "Expect ']' after expression");
                   $expr = new Expr(expr: ExprDef::EArrayGet($expr, $index), pos: $expr->pos->merge($tok->pos));
                 }
               }
@@ -1244,6 +1267,47 @@ namespace Phase {
       return $expr;
     }
 
+    protected function finishCall(Expr $expr)
+    {
+      $args = new \Std\PhaseArray([]);
+      if (!$this->check(TokenType::TokRightParen))
+      {
+        $args = $this->parseArguments();
+      }
+      $this->ignoreNewlines();
+      $this->consume(TokenType::TokRightParen, "Expect ')' after arguments");
+      if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftBrace])))
+      {
+        $args->push(CallArgument::Positional($this->shortLambda(!$this->check(TokenType::TokNewline))));
+      }
+      return new Expr(expr: ExprDef::ECall($expr, $args), pos: $expr->pos->merge($this->previous()->pos));
+    }
+
+    protected function parseArguments():\Std\PhaseArray
+    {
+      $isAfterNamedArgument = false;
+      return $this->parseList(TokenType::TokComma, function ($it = null) use ($isAfterNamedArgument)
+      {
+        if ($this->check(TokenType::TokIdentifier) && $this->checkNext(TokenType::TokColon))
+        {
+          $isAfterNamedArgument = true;
+          $this->consume(TokenType::TokIdentifier, "expected an identifier");
+          $name = $this->previous()->lexeme;
+          $this->consume(TokenType::TokColon, "expected a \":\"");
+          $expr = $this->expression();
+          return CallArgument::Named($name, $expr);
+        }
+        else
+        {
+          if ($isAfterNamedArgument)
+          {
+            throw $this->error($this->peek(), "Positional arguments cannot come after named ones");
+          }
+          return CallArgument::Positional($this->expression());
+        }
+      });
+    }
+
     protected function ternary():Expr
     {
       $start = $this->previous();
@@ -1256,7 +1320,7 @@ namespace Phase {
       $this->consume(TokenType::TokElse, "Expected an 'else' branch");
       $this->ignoreNewlines();
       $elseBranch = $this->expression();
-      return new Expr(expr: ExprDef::ETernary($condition, $thenBranch, $elseBranch), pos: $start->pos->merge($this->previous->pos()));
+      return new Expr(expr: ExprDef::ETernary($condition, $thenBranch, $elseBranch), pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function arrayOrMapLiteral(Bool $isNative = false):Expr
@@ -1273,6 +1337,7 @@ namespace Phase {
     {
       $start = $this->previous();
       $rewindPoint = $this->current;
+      $values = new \Std\PhaseArray([]);
       if (!$this->check(TokenType::TokRightBracket))
       {
         $values = $this->parseList(TokenType::TokComma, function ($it = null)
@@ -1287,7 +1352,7 @@ namespace Phase {
       }
       $this->ignoreNewlines();
       $end = $this->consume(TokenType::TokRightBracket, "Expect ']' after values");
-      return new Expr(expr: ExprDef::EArrayLiteral(values: values, isNative: $isNative), pos: $start->pos->merge($end->pos));
+      return new Expr(expr: ExprDef::EArrayLiteral(values: $values, isNative: $isNative), pos: $start->pos->merge($end->pos));
     }
 
     protected function mapLiteral(Bool $isNative):Expr
@@ -1355,7 +1420,7 @@ namespace Phase {
           else
           {
             $expr = $this->expression();
-            $next = new Expr(expr: new EGrouping($expr), pos: $expr->pos);
+            $next = new Expr(expr: ExprDef::EGrouping($expr), pos: $expr->pos);
           }
         }
         $expr = new Expr(expr: ExprDef::EBinary($expr, "+", $next), pos: $expr->pos->merge($next->pos));
@@ -1494,7 +1559,7 @@ namespace Phase {
       }
       else
       {
-        $args = new \Std\PhaseArray([new FunctionArg(name: "it", type: null, expr: new Expr(expr: new ELiteral(null), pos: previous()->pos))]);
+        $args = new \Std\PhaseArray([new FunctionArg(name: "it", type: null, expr: new Expr(expr: ExprDef::ELiteral(Literal::LNull()), pos: $this->previous()->pos))]);
       }
       if ($isInline && !$this->check(TokenType::TokReturn))
       {
@@ -1546,7 +1611,7 @@ namespace Phase {
         {
           return $this->parseTypePath();
         });
-        $this->consume(new \Std\PhaseArray([TokenType::TokGreater]), "Expect a '>' at the end of a type parameter list");
+        $this->consume(TokenType::TokGreater, "Expect a '>' at the end of a type parameter list");
       }
       return new TypePath(ns: $parts->map(function ($it = null)
       {

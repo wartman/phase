@@ -1,0 +1,7 @@
+namespace Phase::Generator
+
+class PhpGeneratorConfig {
+  new(
+    this.phpVersion: Int
+  ) {}
+}

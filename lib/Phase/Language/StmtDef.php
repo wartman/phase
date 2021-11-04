@@ -40,7 +40,7 @@ namespace Phase\Language {
       return new StmtDef(6, "STry", new \Std\PhaseArray([$body, $catches]));
     }
 
-    public static function SCatch(string $name, TypePath $type, Stmt $body):StmtDef
+    public static function SCatch(string $name, ?TypePath $type, Stmt $body):StmtDef
     {
       return new StmtDef(7, "SCatch", new \Std\PhaseArray([$name, $type, $body]));
     }
@@ -50,12 +50,12 @@ namespace Phase\Language {
       return new StmtDef(8, "SWhile", new \Std\PhaseArray([$condition, $body, $inverted]));
     }
 
-    public static function SFor(string $key, string $value, Expr $target, Stmt $body):StmtDef
+    public static function SFor(string $key, ?string $value, Expr $target, Stmt $body):StmtDef
     {
       return new StmtDef(9, "SFor", new \Std\PhaseArray([$key, $value, $target, $body]));
     }
 
-    public static function SIf(Expr $condition, Stmt $thenBranch, Stmt $elseBranch):StmtDef
+    public static function SIf(Expr $condition, Stmt $thenBranch, ?Stmt $elseBranch):StmtDef
     {
       return new StmtDef(10, "SIf", new \Std\PhaseArray([$condition, $thenBranch, $elseBranch]));
     }
@@ -70,7 +70,7 @@ namespace Phase\Language {
       return new StmtDef(12, "SBlock", new \Std\PhaseArray([$statements]));
     }
 
-    public static function SReturn(Expr $value):StmtDef
+    public static function SReturn(?Expr $value):StmtDef
     {
       return new StmtDef(13, "SReturn", new \Std\PhaseArray([$value]));
     }

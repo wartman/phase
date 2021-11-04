@@ -14,7 +14,7 @@ class PhaseArray
 {
   private data: $array
 
-  new(this.data: $array) {}
+  new(this.data: $array = $[]) {}
 
   length: Int { 
     get { count(this.data) }
@@ -51,7 +51,7 @@ class PhaseArray
   map(transform): PhaseArray {
     var out = []
     for (item in this.data) {
-      value |> transform() |> out.push()
+      item |> transform() |> out.push()
     }
     return out
   }

@@ -1,7 +1,9 @@
 [::Std::Compiler::Extern()]
 interface String {
+  length: Int
   toLowerCase(): String
   toUpperCase(): String
   split(sep: String): Array<String>
-  // etc
+  substr(pos: Int, end: ?Int = null): String
+  substring(startIndex: Int, endIndex: ?Int = null): String
 }

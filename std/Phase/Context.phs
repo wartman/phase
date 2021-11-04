@@ -1,0 +1,35 @@
+namespace Phase
+
+use Phase::Language::Type
+
+class Context {
+  new (
+    this.loader: TypeLoader,
+    this.types: ?Map<String, Type> = null
+  ) {
+    if (this.types == null) this.types = Map()
+  }
+
+  addTypes(types: Map<String, Type>): Context {
+    for (name: type in types) {
+      this.types.set(name, type)
+    }
+    return this
+  }
+
+  getType(name: String): Type {
+    if (this.types.contains(name)) {
+      return this.types.get(name)
+    }
+    var type = this.loader.load(name)
+    if (type != null) {
+      this.types.set(name, type)
+      return type
+    }
+    return TUnknown(null)
+  }
+
+  unify(a:Type, b:Type) {
+    return a == b // hm
+  } 
+}

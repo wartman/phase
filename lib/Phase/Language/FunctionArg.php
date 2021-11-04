@@ -5,7 +5,7 @@ namespace Phase\Language {
   class FunctionArg
   {
 
-    public function __construct(Token $name, ?TypePath $type, ?Expr $expr, Bool $isInit = false)
+    public function __construct(string $name, ?TypePath $type, ?Expr $expr, Bool $isInit = false)
     {
       $this->isInit = $isInit;
       $this->expr = $expr;
@@ -13,7 +13,7 @@ namespace Phase\Language {
       $this->name = $name;
     }
 
-    public Token $name;
+    public string $name;
 
     public ?TypePath $type;
 

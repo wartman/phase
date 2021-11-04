@@ -1,7 +1,11 @@
 namespace Phase
 
-use Phase::Language::{ Type }
+use Phase::Language::Type
 
-interface TypeLoader {
-  load(path: String): Type
+class TypeLoader {
+  new(this.root: String) {}
+
+  load(path: String): ?Type {
+    return Type.TUnknown(null)
+  }
 }

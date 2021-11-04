@@ -10,31 +10,31 @@ namespace Std {
   class PhaseArray implements ArrayAccess, Countable, IteratorAggregate, Traversable
   {
 
-    public function __construct(array $value)
+    public function __construct(array $data = [])
     {
-      $this->value = $value;
+      $this->data = $data;
     }
 
-    protected array $value;
+    protected array $data;
 
     public function __get_length():int 
     {
-      return count($this->value);
+      return count($this->data);
     }
 
     public function at(int $index)
     {
-      return $this->value[$index];
+      return $this->data[$index];
     }
 
     public function insert(int $index, $value):int
     {
-      return $this->value[$index] = $value;
+      return $this->data[$index] = $value;
     }
 
     public function push($value):int
     {
-      $this->value[] = $value;
+      $this->data[] = $value;
       return $this->length;
     }
 
@@ -46,7 +46,7 @@ namespace Std {
     public function filter($f):PhaseArray
     {
       $out = new \Std\PhaseArray([]);
-      foreach ($this->value as $item)
+      foreach ($this->data as $item)
       {
         if ($f($item))
         {
@@ -56,12 +56,24 @@ namespace Std {
       return $out;
     }
 
+    public function find($elt):mixed
+    {
+      foreach ($this->data as $item)
+      {
+        if ($elt($item))
+        {
+          return $item;
+        }
+      }
+      return null;
+    }
+
     public function map($transform):PhaseArray
     {
       $out = new \Std\PhaseArray([]);
-      foreach ($this->value as $item)
+      foreach ($this->data as $item)
       {
-        $out->push($transform(value));
+        $out->push($transform($item));
       }
       return $out;
     }
@@ -73,7 +85,7 @@ namespace Std {
 
     public function indexOf($item):int
     {
-      $index = array_search($item, $this->value, true);
+      $index = array_search($item, $this->data, true);
       return $index == false ? -1 : $index;
     }
 
@@ -82,9 +94,9 @@ namespace Std {
       $removed = false;
       for ($index = 0; $index < $this->length; $index++)
       {
-        if ($this->value[$index] == $item)
+        if ($this->data[$index] == $item)
         {
-          array_splice($this->value, $index, 1);
+          array_splice($this->data, $index, 1);
           $removed = true;
           break;
         }
@@ -94,27 +106,27 @@ namespace Std {
 
     public function reverse()
     {
-      $this->value = array_reverse($this->value);
+      $this->data = array_reverse($this->data);
     }
 
     public function pop()
     {
-      return array_pop($this->value);
+      return array_pop($this->data);
     }
 
     public function shift()
     {
-      return array_shift($this->value);
+      return array_shift($this->data);
     }
 
     public function sort($f)
     {
-      usort($this->value, $f);
+      usort($this->data, $f);
     }
 
     public function join(string $sep):string
     {
-      return implode($sep, $this->value);
+      return implode($sep, $this->data);
     }
 
     public function slice(int $pos, int $end = null):PhaseArray
@@ -129,7 +141,7 @@ namespace Std {
       }
       if ($end == null)
       {
-        return array_slice($this->value, $pos);
+        return array_slice($this->data, $pos);
       }
       else
       {
@@ -143,14 +155,14 @@ namespace Std {
         }
         else
         {
-          return array_slice($this->value, $pos, $end - $pos);
+          return array_slice($this->data, $pos, $end - $pos);
         }
       }
     }
 
     public function concat(PhaseArray $other)
     {
-      return new PhaseArray(array_merge($this->value, $other->unwrap()));
+      return new PhaseArray(array_merge($this->data, $other->unwrap()));
     }
 
     public function splice(int $pos, int $len):PhaseArray
@@ -159,19 +171,19 @@ namespace Std {
       {
         return new \Std\PhaseArray([]);
       }
-      return array_splice($this->value, $pos, $len);
+      return array_splice($this->data, $pos, $len);
     }
 
     public function unshift($item)
     {
-      return array_unshift($this->value, $item);
+      return array_unshift($this->data, $item);
     }
 
     public function offsetGet($offset)
     {
       try
       {
-        return $this->value[$offset];
+        return $this->data[$offset];
       }
       catch (\Throwable $e)
       {
@@ -181,14 +193,14 @@ namespace Std {
 
     public function offsetExists($offset)
     {
-      return isset($this->value[$offset]);
+      return isset($this->data[$offset]);
     }
 
     public function offsetSet($offset, $value)
     {
       if ($offset == null)
       {
-        $this->value[] = $value;
+        $this->data[] = $value;
       }
       else
       {
@@ -198,15 +210,15 @@ namespace Std {
 
     public function offsetUnset($offset)
     {
-      if (isset($this->value[$offset]))
+      if (isset($this->data[$offset]))
       {
-        unset($this->value[$offset]);
+        unset($this->data[$offset]);
       }
     }
 
     public function getIterator():Traversable
     {
-      return new ArrayIterator($this->value);
+      return new ArrayIterator($this->data);
     }
 
     public function count():int
@@ -216,7 +228,7 @@ namespace Std {
 
     public function unwrap()
     {
-      return $this->value;
+      return $this->data;
     }
 
     public function __get($prop)

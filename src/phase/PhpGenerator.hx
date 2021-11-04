@@ -92,8 +92,10 @@ class PhpGenerator
     append = [];
     scope = new PhpScope(); // todo: get rid of this
 
+    trace('   analyzing');
     var analysis = new StaticAnalyzer(stmts, server, reporter);
     context = analysis.analyze();
+    trace('   done');
 
     var out:Array<String> = [];
     for (stmt in stmts) {
@@ -156,6 +158,25 @@ class PhpGenerator
   }
 
   public function visitReturnStmt(stmt:Stmt.Return):String {
+    if (stmt.value != null) switch Std.downcast(stmt.value, Expr.Match) {
+      case null:
+      case match:
+        // @todo: we need to make this more generic :P. It has to 
+        //        work for vars and stuff too.
+        for (item in match.cases) {
+          var last = item.body[ item.body.length - 1 ];
+          switch Std.downcast(last, Stmt.Expression) {
+            case null:
+              throw error(stmt.keyword, 'Matches must return an expression');
+            case stmtExpr:
+              item.body[ item.body.length - 1 ] = new Stmt.Return(
+                stmt.keyword,
+                stmtExpr.expression
+              );
+          }
+        }
+        return getIndent() + generateExpr(match);
+    }
     return getIndent() + (stmt.value == null
       ? 'return;'
       : 'return ' + generateExpr(stmt.value) + ';');
@@ -254,6 +275,10 @@ class PhpGenerator
     for (field in stmt.fields) {
       if (field == constructor) {
         continue;
+      }
+      if (mode == GeneratingInterface) switch field.kind {
+        case FVar(_, _) | FProp(_, _, _): continue;
+        default:
       }
       if (field.attribute.length > 0) {
         body += generateAttributes({
@@ -598,8 +623,11 @@ class PhpGenerator
     var type = typeOf(expr.target);
 
     switch type {
-      case TInstance(cls) | TClass(cls): // temp 
+      case TInstance(cls) | TClass(cls) if (cls.superclass != null): // temp 
         var superclass = findType(cls.superclass);
+        if (superclass == null) {
+          return '/* NOT FOUND: ${cls.superclass.getTypeName()} */';
+        }
         switch superclass {
           case TClass({ 
             name: 'PhaseEnum',
@@ -609,12 +637,16 @@ class PhpGenerator
             fields: _
           }):
             return generateEnumMatch(expr, cls);
-          default:
+          default: 
+            return '/* NOT A TCLASS: ${cls.superclass.getTypeName()} */';
         }
       default:
+        if (type == null) return '/* NOT FOUND */';
+        return '/* NOT A CLASS: ${type.getTypeName()} */';
     }
   
-    return '';
+    return '/* NOT A CLASS: ${type.getTypeName()} */';
+    // return '';
   }
 
   function generateEnumMatch(expr:Expr.Match, cls:phase.analysis.Type.ClassType):String {
@@ -1019,8 +1051,11 @@ class PhpGenerator
 
   function generateTypePath(t:Expr.Type):String {
     var type = t.path.map(t -> t.lexeme).join('\\');
+    if (type == 'Any') return 'mixed'; // Can't be nullable
     if (typeAliases.exists(type)) {
-      return typeAliases.get(type);
+      type = typeAliases.get(type);
+      if (t.nullable) return '?$type';
+      return type;
     }
     if (t.absolute) {
       type = '\\' + type;
@@ -1149,8 +1184,10 @@ class PhpGenerator
 
   function findType(type:phase.analysis.Type) {
     return switch type {
-      case TPath(tp): server.locateType(tp.namespace.concat([ tp.name ]).join('::'));
-      case other: other;
+      case TPath(tp): 
+        server.locateType(type.getTypeName());
+      case other:
+        other;
     }
   }
 

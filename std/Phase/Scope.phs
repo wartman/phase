@@ -4,17 +4,20 @@ use Phase::Language::{ Type }
 
 class Scope {
   new(
-    this.values: Map<String, Type> = [],
-    this.parent: ?Scope,
-    this.children: Array<Scope> = []
-  ) {}
+    this.values: ?Map<String, Type> = null,
+    this.parent: ?Scope = null,
+    this.children: ?Array<Scope> = null
+  ) {
+    if (this.values == null) this.values = Map()
+    if (this.children == null) this.children = []
+  }
 
   declare(name: String, type: Type) {
     this.values[name] = type
   }
 
   isDeclared(name: String): Bool {
-    if (!this.values[name] |> isset() && this.parent != null) {
+    if (!(this.values[name] |> isset()) && this.parent != null) {
       return this.parent.isDeclared(name)
     }
     return this.values[name] |> isset()

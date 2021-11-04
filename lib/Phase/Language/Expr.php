@@ -5,8 +5,9 @@ namespace Phase\Language {
   class Expr
   {
 
-    public function __construct(ExprDef $expr, Position $pos)
+    public function __construct(ExprDef $expr, Position $pos, ?Type $type = null)
     {
+      $this->type = $type;
       $this->pos = $pos;
       $this->expr = $expr;
     }
@@ -14,6 +15,8 @@ namespace Phase\Language {
     public ExprDef $expr;
 
     public Position $pos;
+
+    public ?Type $type;
 
   }
 

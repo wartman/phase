@@ -5,6 +5,10 @@ namespace Std
 class PhaseString {
   private value: $string
 
+  length: Int {
+    get { this.value |> strlen() }
+  }
+
   new(this.value) {}
 
   toLowerCase(): String { this.value |> mb_strtolower() }
@@ -12,4 +16,28 @@ class PhaseString {
   toUpperCase(): String { this.value |> mb_strtoupper() }
 
   split(sep: String): PhaseArray { this.value |> explode(sep) |> PhaseArray() }
+
+  substr(pos: Int, len: ?Int = null): String { mb_substr(this.value, pos, len) }
+
+  substring(startIndex: Int, endIndex: ?Int = null): String {
+    var str = this.value
+    if (endIndex == null) {
+			if (startIndex < 0) {
+				startIndex = 0
+			}
+			return mb_substr(str, startIndex)
+		}
+		if (endIndex < 0) {
+			endIndex = 0
+		}
+		if (startIndex < 0) {
+			startIndex = 0
+		}
+		if (startIndex > endIndex) {
+			var tmp = endIndex
+			endIndex = startIndex
+			startIndex = tmp
+		}
+		return mb_substr(str, startIndex, endIndex - startIndex)
+  }
 }

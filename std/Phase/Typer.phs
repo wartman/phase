@@ -31,7 +31,6 @@ use Phase::Language::{
 class Typer {
   private stmts: Array<Stmt>
   private types: Map<String, Type>
-  private imports: Map<String, TypePath>
   private reporter: ErrorReporter
   private scope: ?Scope = null
   private ns: Array<String>
@@ -44,27 +43,31 @@ class Typer {
 
   /// Only resolve the declared types in this module.
   typeSurface(): Map<String, Type> {
-    this.types = []
+    this.types = Map()
+    this.scope = Scope()
+    
     for (stmt in this.stmts) {
       this.typeSurfaceDecl(stmt)
     }
+
     return this.types
   }
   
-  private typeSurfaceDecl(stmt: Stmt) {
-    var def: StmtDef = stmt.def
+  private typeSurfaceDecl(stmt: Stmt): Map<String, Type> {
+    var def: StmtDef = stmt.stmt
     match (def) {
       SNamespace(path, decls, attrs) -> {
         this.ns = path.ns.concat([ path.name ])
         for (decl in decls) this.typeSurfaceDecl(decl)
       }
+      SUse(path, kind, attrs) -> this.typeUse(path, kind)
       SClass(cls) -> {
         var tp: TypePath = TypePath(
-          ns: ns,
+          ns: this.ns,
           name: cls.name,
           params: cls.params
         )
-        var type = Type.TClass(cls)
+        var type = Type.TInstance(cls)
         this.types.set(tp.toString(), type)
         if (this.scope != null) {
           this.scope.declare(cls.name, type)
@@ -72,7 +75,7 @@ class Typer {
       }
       SFunction(func) -> {
         var tp: TypePath = TypePath(
-          ns: ns,
+          ns: this.ns,
           name: func.name,
           params: func.params
         )
@@ -84,7 +87,7 @@ class Typer {
       }
       default -> null // ignore
     }
-    return types
+    return this.types
   }
 
   /// Resolve the declared types in this module and type all
@@ -101,55 +104,10 @@ class Typer {
   }
 
   typeStmt(stmt: Stmt) {
-    var def: StmtDef = stmt.def
+    var def: StmtDef = stmt.stmt
     match (def) {
       SExpr(expr) -> this.typeExpr(expr)
-      SUse(path, kind, attributes) -> {
-        // temp: until we have better typing
-        var k: UseKind = kind
-        match (k) {
-          UseNormal -> {
-            var ns = path.copy()
-            var name = ns.pop()
-            this.scope.declare(name, this.resolve(TypePath(
-              ns: ns,
-              name: name,
-              isAbsolute: true
-            )))
-          }
-          UseAlias(alias) -> {
-            // temp: until we have better typing
-            var target: UseTarget = alias
-            var ns = path.copy()
-            var name = ns.pop()
-            var type = TypePath(
-              ns: ns,
-              name: name,
-              isAbsolute: true
-            ) |> this.resolve()
-            match (target) {
-              TargetType(name) -> this.scope.declare(name, type)
-              TargetFunction(name) -> {
-                // todo
-              }
-            }
-          }
-          UseSub(items) -> for (item in items) {
-            // temp: until we have better typing
-            var target: UseTarget = item
-            match (target) {
-              TargetType(name) -> this.scope.declare(name, TypePath(
-                ns: path,
-                name: name,
-                isAbsolute: true
-              ))
-              TargetFunction(name) -> {
-                // todo
-              }
-            }
-          }
-        }
-      }
+      SUse(path, kind, attributes) -> this.typeUse(path, kind)
       SVar(name, type, init) -> 
         if (type != null) { 
           this.scope.declare(name, type)
@@ -189,9 +147,9 @@ class Typer {
       SReturn(expr) -> this.typeExpr(expr)
       SFunction(decl) -> this.typeFunction(decl)
       SClass(cls) -> {
-        this.scope.declare(cls.name, Type.TClass(cls))
+        this.scope.declare(cls.name, Type.TInstance(cls))
         this.wrapScope {
-          this.scope.declare('static', Type.TClass(cls))
+          this.scope.declare('static', Type.TInstance(cls))
           this.scope.declare('this', Type.TInstance(cls))
           for (field in cls.fields) this.typeField(field, cls)
         }
@@ -200,7 +158,7 @@ class Typer {
   }
 
   typeExpr(expr: Expr) {
-    var def: ExprDef = expr.def
+    var def: ExprDef = expr.expr
     match(def) {
       EAttribute(path, args) -> null // todo
       EAssign(name, value) -> {
@@ -247,12 +205,12 @@ class Typer {
         var type: Type = callee.type
         match (type) {
           TFun(func) -> expr.type = this.resolve(func.ret)
-          TClass(cls) -> expr.type = Type.TInstance(cls)
+          TInstance(cls) -> expr.type = Type.TInstance(cls)
           TUnknown(path) -> {
             type = this.resolve(path)
             match (type) {
               TFun(func) -> expr.type = this.resolve(func.ret)
-              TClass(cls) -> expr.type = Type.TInstance(cls)
+              TInstance(cls) -> expr.type = Type.TInstance(cls)
               default -> null // Do we throw errors here?
             }    
           }
@@ -358,6 +316,51 @@ class Typer {
     }
   }
 
+  typeUse(path: Array<String>, kind: UseKind) {
+    match (kind) {
+      UseNormal -> {
+        var ns = path.copy()
+        var name = ns.pop()
+        this.scope.declare(name, this.resolve(TypePath(
+          ns: ns,
+          name: name,
+          isAbsolute: true
+        )))
+      }
+      UseAlias(alias) -> {
+        // temp: until we have better typing
+        var target: UseTarget = alias
+        var ns = path.copy()
+        var name = ns.pop()
+        var type = TypePath(
+          ns: ns,
+          name: name,
+          isAbsolute: true
+        ) |> this.resolve()
+        match (target) {
+          TargetType(name) -> this.scope.declare(name, type)
+          TargetFunction(name) -> {
+            // todo
+          }
+        }
+      }
+      UseSub(items) -> for (item in items) {
+        // temp: until we have better typing
+        var target: UseTarget = item
+        match (target) {
+          TargetType(name) -> this.scope.declare(name, Type.TUnknown(TypePath(
+            ns: path,
+            name: name,
+            isAbsolute: true
+          )))
+          TargetFunction(name) -> {
+            // todo
+          }
+        }
+      }
+    }
+  }
+
   typeFunction(fun: FunctionDecl) {
     this.scope.declare(decl.name, Type.TFun(decl))
     this.wrapScope {
@@ -391,11 +394,11 @@ class Typer {
     var type = this.scope.resolve(name)
     if (type != null) return type
     
-    var imported = imports.get(path)
-    if (imported != null) {
-      type = this.scope.resolve(imported.toString())
-    }
-    if (type != null) return type
+    // var imported = imports.get(path)
+    // if (imported != null) {
+    //   type = this.scope.resolve(imported.toString())
+    // }
+    // if (type != null) return type
 
     if (!path.isAbsolute) {
       var local: TypePath = TypePath(

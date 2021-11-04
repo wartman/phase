@@ -187,6 +187,7 @@ class Parser {
       throw this.error(this.previous(), '`use` is not allowed outside a namespace')
     }
     
+    var start = this.previous()
     var kind: UseKind = UseKind.UseNormal()
     var absolute = false
     var path: Array<String> = []
@@ -207,10 +208,10 @@ class Parser {
         }
         break
       } else if (this.matches([ TokenType.TokLeftBrace ])) {
-        kind = UseKind.UseSub(this.parseList(TokComma) {
+        kind = UseKind.UseSub(this.parseList(TokenType.TokComma) {
           if (this.matches([ TokenType.TokTypeIdentifier, TokenType.TokIdentifier ])) {
             var tok = this.previous()
-            return if (tok.type == TokenType.TokIdentifier) UseTarget.TargetFunction(tok) else UseTarget.TargetType(tok)
+            return if (tok.type == TokenType.TokIdentifier) UseTarget.TargetFunction(tok.lexeme) else UseTarget.TargetType(tok.lexeme)
           } else {
             throw this.error(this.peek(), "Expect an identifier or a type identifier")
             return null
@@ -249,7 +250,11 @@ class Parser {
     this.expectEndOfStatement()
 
     return Stmt(
-      stmt: StmtDef.SUse(path, absolute, kind, attribute),
+      stmt: StmtDef.SUse(
+        path: path,
+        kind: kind, 
+        attributes: attributes
+      ),
       pos: start.pos.merge(this.previous().pos)
     )
   }
@@ -341,7 +346,7 @@ class Parser {
         }
 
         args.push(FunctionArg(
-          name: name,
+          name: name.lexeme,
           type: type,
           expr: expr,
           isInit: isInit
@@ -367,7 +372,7 @@ class Parser {
     if (!this.check(TokenType.TokNewline) && !this.check(TokenType.TokReturn)) {
       // Treat the next expression as a return.
       body = [ Stmt(
-        stmt: StmtDef.SReturn(expression()),
+        stmt: StmtDef.SReturn(this.expression()),
         pos: start.pos.merge(this.previous().pos)
       ) ]
       this.ignoreNewlines()
@@ -456,7 +461,8 @@ class Parser {
               ),
               type: a.type,
               access: [ FieldAccess.APublic ],
-              attributes: []
+              attributes: [],
+              pos: this.previous().pos
             ))
           }
         }
@@ -559,7 +565,7 @@ class Parser {
     )
   }
 
-  private enumDeclaration(attribute: Array<Expr>): Stmt {
+  private enumDeclaration(attributes: Array<Expr>): Stmt {
     var start = this.previous()
     var enumName = this.consume(TokenType.TokTypeIdentifier, 'Expect an enum name. Must start uppercase.')
     var params = this.parseTypeParams()
@@ -682,6 +688,7 @@ class Parser {
   }
 
   private fieldDeclaration(): Field {
+    var start = this.previous()
     if (this.matches([ TokenType.TokUse ])) {
       // Note: this will need to get more complex later.
       var out = Field(
@@ -690,7 +697,8 @@ class Parser {
           path: this.parseTypePath(false)
         ),
         access: [],
-        attributes: []
+        attributes: [],
+        pos: start.pos.merge(this.previous().pos)
       )
       this.expectEndOfStatement()
       return out
@@ -713,7 +721,8 @@ class Parser {
           initializer: value
         ),
         access: [ AConst ],
-        attributes: []
+        attributes: [],
+        pos: start.pos.merge(this.previous().pos)
       );
       this.expectEndOfStatement()
       return out
@@ -769,7 +778,8 @@ class Parser {
           type: type,
           initializer: null
         ),
-        attributes: attributes
+        attributes: attributes,
+        pos: start.pos.merge(this.previous().pos)
       )
     }
 
@@ -832,7 +842,8 @@ class Parser {
           setter: setter,
           type: type
         ),
-        attributes: attributes
+        attributes: attributes,
+        pos: start.pos.merge(this.previous().pos)
       )
     }
 
@@ -853,7 +864,8 @@ class Parser {
           type: type,
           initializer: expr
         ),
-        attributes: attributes
+        attributes: attributes,
+        pos: start.pos.merge(this.previous().pos)
       )
     }
 
@@ -885,7 +897,8 @@ class Parser {
         ret: type,
         attributes: []
       )),
-      attributes: attributes
+      attributes: attributes,
+      pos: start.pos.merge(this.previous().pos)
     )
   }
 
@@ -927,7 +940,7 @@ class Parser {
 
   private expressionStatement() {
     var expr = this.expression()
-    this.expressionStatement()
+    this.expectEndOfStatement()
     return Stmt(
       stmt: StmtDef.SExpr(expr),
       pos: expr.pos
@@ -977,7 +990,7 @@ class Parser {
     match (def) {
       SBlock(_) -> null
       default -> thenBranch = Stmt(
-        stmt: StmtDef.SBlock(thenBranch),
+        stmt: StmtDef.SBlock([ thenBranch ]),
         pos: thenBranch.pos
       )
     }
@@ -989,7 +1002,7 @@ class Parser {
       match (def) {
         SBlock(_) -> null
         default -> elseBranch = Stmt(
-          stmt: StmtDef.SBlock(elseBranch),
+          stmt: StmtDef.SBlock([ elseBranch ]),
           pos: elseBranch.pos
         )
       }
@@ -1212,7 +1225,7 @@ class Parser {
       var isDefault = false
       var condition: ?Expr = null
       
-      if (this.matches([ TokDefault ])) {
+      if (this.matches([ TokenType.TokDefault ])) {
         isDefault = true
       } else {
         condition = this.expression()
@@ -1538,7 +1551,7 @@ class Parser {
         } else {
           this.ignoreNewlines()
           var index = this.expression()
-          var tok = this.consume(TokRightBracket, "Expect ']' after expression")
+          var tok = this.consume(TokenType.TokRightBracket, "Expect ']' after expression")
           expr = Expr(
             expr: ExprDef.EArrayGet(expr, index),
             pos: expr.pos.merge(tok.pos)
@@ -1550,6 +1563,44 @@ class Parser {
     }
 
     return expr
+  }
+
+  private finishCall(expr: Expr) {
+    var args: Array<CallArgument> = []
+    if (!this.check(TokenType.TokRightParen)) {
+      args = this.parseArguments()
+    }
+    this.ignoreNewlines()
+    this.consume(TokenType.TokRightParen, "Expect ')' after arguments")
+    
+    // Handle trailing arguments (eg, `foo('a') { it }`)
+    if (this.matches([ TokenType.TokLeftBrace ])) {
+      args.push(CallArgument.Positional(this.shortLambda(!this.check(TokenType.TokNewline))))
+    }
+
+    return Expr(
+      expr: ExprDef.ECall(expr, args),
+      pos: expr.pos.merge(this.previous().pos)
+    )
+  }
+
+  private parseArguments(): Array<CallArgument> {
+    var isAfterNamedArgument = false
+    return this.parseList(TokenType.TokComma) {
+      if (this.check(TokenType.TokIdentifier) && this.checkNext(TokenType.TokColon)) {
+        isAfterNamedArgument = true
+        this.consume(TokenType.TokIdentifier, 'expected an identifier')
+        var name = this.previous().lexeme
+        this.consume(TokenType.TokColon, 'expected a ":"')
+        var expr = this.expression()
+        return CallArgument.Named(name, expr)
+      } else {
+        if (isAfterNamedArgument) {
+          throw this.error(this.peek(), 'Positional arguments cannot come after named ones')
+        }
+        return CallArgument.Positional(this.expression())
+      }
+    }
   }
 
   private ternary(): Expr {
@@ -1565,7 +1616,7 @@ class Parser {
     var elseBranch = this.expression()
     return Expr(
       expr: ExprDef.ETernary(condition, thenBranch, elseBranch),
-      pos: start.pos.merge(this.previous.pos())
+      pos: start.pos.merge(this.previous().pos)
     )
   }
 
@@ -1580,9 +1631,10 @@ class Parser {
   private arrayLiteral(isNative: Bool): Expr {
     var start: Token = this.previous()
     var rewindPoint = this.current
+    var values: Array<Expr> = []
 
     if (!this.check(TokenType.TokRightBracket)) {
-      var values = this.parseList(TokenType.TokComma) { this.expression() }
+      values = this.parseList(TokenType.TokComma) { this.expression() }
     }
 
     if (this.matches([ TokenType.TokColon ])) {
@@ -1688,7 +1740,7 @@ class Parser {
       } else {
         var expr = this.expression()
         next = Expr(
-          expr: EGrouping(expr),
+          expr: ExprDef.EGrouping(expr),
           pos: expr.pos
         )
       }
@@ -1859,8 +1911,8 @@ class Parser {
           name: 'it',
           type: null,
           expr: Expr(
-            expr: ELiteral(null),
-            pos: previous().pos
+            expr: ExprDef.ELiteral(Literal.LNull()),
+            pos: this.previous().pos
           )
         )
       ]
@@ -1929,7 +1981,7 @@ class Parser {
 
     if (this.matches([ TokenType.TokLess ])) {
       params = this.parseList(TokenType.TokComma) { this.parseTypePath() }
-      this.consume([ TokenType.TokGreater ], "Expect a '>' at the end of a type parameter list")
+      this.consume(TokenType.TokGreater, "Expect a '>' at the end of a type parameter list")
     }
 
     return TypePath(

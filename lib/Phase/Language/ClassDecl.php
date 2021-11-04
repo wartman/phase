@@ -5,12 +5,13 @@ namespace Phase\Language {
   class ClassDecl
   {
 
-    public function __construct(string $name, string $kind, ?TypePath $superclass, \Std\PhaseArray $interfaces, \Std\PhaseArray $fields, \Std\PhaseArray $attributes)
+    public function __construct(string $name, string $kind, \Std\PhaseArray $params, ?TypePath $superclass, \Std\PhaseArray $interfaces, \Std\PhaseArray $fields, \Std\PhaseArray $attributes)
     {
       $this->attributes = $attributes;
       $this->fields = $fields;
       $this->interfaces = $interfaces;
       $this->superclass = $superclass;
+      $this->params = $params;
       $this->kind = $kind;
       $this->name = $name;
     }
@@ -18,6 +19,8 @@ namespace Phase\Language {
     public string $name;
 
     public string $kind;
+
+    public \Std\PhaseArray $params;
 
     public ?TypePath $superclass;
 

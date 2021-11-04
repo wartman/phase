@@ -110,7 +110,7 @@ namespace Phase\Language {
       return new ExprDef(20, "EMapLiteral", new \Std\PhaseArray([$keys, $values, $isNative]));
     }
 
-    public static function ELambda(Stmt $func):ExprDef
+    public static function ELambda(FunctionDecl $func):ExprDef
     {
       return new ExprDef(21, "ELambda", new \Std\PhaseArray([$func]));
     }

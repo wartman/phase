@@ -16,7 +16,7 @@ class PhaseMap
 {
   private data: $array
 
-  new (this.data: $array) {}
+  new (this.data: $array = $[]) {}
 
   set(key: Any, value: Any) {
     this.data[key] = value

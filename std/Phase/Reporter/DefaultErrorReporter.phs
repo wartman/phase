@@ -1,13 +1,51 @@
 namespace Phase::Reporter
 
-use Phase::ErrorReporter
+use Phase::{ ErrorReporter, Source }
 use Phase::Language::Position
 
 class DefaultErrorReporter implements ErrorReporter {
-  new() {}
+  new(this.source: Source) {}
   
   report(pos: Position, message: String) {
-    // todo: implement this
-    print(message)
+    var content: String = this.source.content
+    var start:Int = pos.start
+    var end:Int = pos.end
+    var text: String = content.substring(start, end)
+    var arrows = '^'
+
+    while (start > 0) {
+      var t = content[--start]
+      if (t == '\n') {
+        break
+      } else {
+        text = t +++ text
+        arrows = ' ' +++ arrows
+      }
+    }
+
+    while (end <= content.length) {
+      var t = content[end++]
+      if (t == '\n') {
+        break
+      } else {
+        text = text +++ t
+      }
+    }
+
+    var line: Int = content.substring(0, end).split('\n').length - 1
+    var textLines: Array<String> = text.split('\n')
+    var begin: Int = 0
+
+    this.print('')
+    this.print("ERROR: ${pos.file}:${line} [${start} ${end}]")
+    for (t in textLines) {
+      this.print(t)
+    }
+    this.print(message)
+    this.print('')
+  }
+
+  print(str: String) {
+    echo('${str}${PHP_EOL}')
   }
 }

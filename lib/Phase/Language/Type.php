@@ -30,14 +30,9 @@ namespace Phase\Language {
       return new Type(4, "TFun", new \Std\PhaseArray([$func]));
     }
 
-    public static function TClass(ClassDecl $cls):Type
-    {
-      return new Type(5, "TClass", new \Std\PhaseArray([$cls]));
-    }
-
     public static function TInstance(ClassDecl $cls):Type
     {
-      return new Type(6, "TInstance", new \Std\PhaseArray([$cls]));
+      return new Type(5, "TInstance", new \Std\PhaseArray([$cls]));
     }
 
   }
