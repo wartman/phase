@@ -23,6 +23,7 @@ namespace Phase\Generator {
   use Phase\Language\ClassDecl;
   use Phase\Language\ClassKind;
   use Phase\Language\MatchCase;
+  use Phase\Language\Type;
 
   class PhpGenerator implements Generator
   {
@@ -172,7 +173,7 @@ namespace Phase\Generator {
       else if ($__matcher_2->tag == "EAssign") { 
         $name = $__matcher_2->params[0];
         $value = $__matcher_2->params[1];
-        return "";
+        return "$" . ($this->safeVar($name)) . " = " . ($this->generateExpr($value)) . "";
       }
       else if ($__matcher_2->tag == "EBinary") { 
         $left = $__matcher_2->params[0];
@@ -180,9 +181,106 @@ namespace Phase\Generator {
         $right = $__matcher_2->params[2];
         return $this->generateBinary($left, $op, $right);
       }
+      else if ($__matcher_2->tag == "EUnary") { 
+        $op = $__matcher_2->params[0];
+        $expr = $__matcher_2->params[1];
+        $right = $__matcher_2->params[2];
+        return $this->generateUnary($op, $expr, $right);
+      }
+      else if ($__matcher_2->tag == "EIs") { 
+        $left = $__matcher_2->params[0];
+        $type = $__matcher_2->params[1];
+        return "" . ($this->generateExpr($left)) . " instanceof " . ($this->phpTypePath($type)) . "";
+      }
+      else if ($__matcher_2->tag == "ELogical") { 
+        $left = $__matcher_2->params[0];
+        $op = $__matcher_2->params[1];
+        $right = $__matcher_2->params[2];
+        return "" . ($this->generateExpr($left)) . " " . ($op) . " " . ($this->generateExpr($right)) . "";
+      }
+      else if ($__matcher_2->tag == "ERange") { 
+        $from = $__matcher_2->params[0];
+        $to = $__matcher_2->params[1];
+        return "";
+      }
+      else if ($__matcher_2->tag == "ECall") { 
+        $callee = $__matcher_2->params[0];
+        $args = $__matcher_2->params[1];
+        return $this->generateCall($callee, $args);
+      }
+      else if ($__matcher_2->tag == "EGet") { 
+        $target = $__matcher_2->params[0];
+        $field = $__matcher_2->params[1];
+        return $this->generateGet($target, $field);
+      }
+      else if ($__matcher_2->tag == "ESet") { 
+        $target = $__matcher_2->params[0];
+        $field = $__matcher_2->params[1];
+        $value = $__matcher_2->params[2];
+        return $this->generateSet($target, $field, $value);
+      }
+      else if ($__matcher_2->tag == "EArrayGet") { 
+        $target = $__matcher_2->params[0];
+        $field = $__matcher_2->params[1];
+        return $this->generateArrayGet($target, $field);
+      }
+      else if ($__matcher_2->tag == "EArraySet") { 
+        $target = $__matcher_2->params[0];
+        $field = $__matcher_2->params[1];
+        $value = $__matcher_2->params[2];
+        return $this->generateArraySet($target, $field, $value);
+      }
+      else if ($__matcher_2->tag == "ETernary") { 
+        $condition = $__matcher_2->params[0];
+        $thenBranch = $__matcher_2->params[1];
+        $elseBranch = $__matcher_2->params[2];
+        return $this->generateTernary($condition, $thenBranch, $elseBranch);
+      }
+      else if ($__matcher_2->tag == "ESuper") { 
+        $method = $__matcher_2->params[0];
+        return "";
+      }
+      else if ($__matcher_2->tag == "EPath") { 
+        $path = $__matcher_2->params[0];
+        return $this->phpTypePath($path);
+      }
+      else if ($__matcher_2->tag == "EThis") { 
+        return "\$this";
+      }
+      else if ($__matcher_2->tag == "EStatic") { 
+        return "static";
+      }
+      else if ($__matcher_2->tag == "EGrouping") { 
+        $expr = $__matcher_2->params[0];
+        return "(" . ($this->generateExpr($expr)) . ")";
+      }
+      else if ($__matcher_2->tag == "ELiteral") { 
+        $lit = $__matcher_2->params[0];
+        return $this->generateLiteral($lit);
+      }
+      else if ($__matcher_2->tag == "EArrayLiteral") { 
+        $values = $__matcher_2->params[0];
+        $isNative = $__matcher_2->params[1];
+        return $this->generateArrayLiteral($values, $isNative);
+      }
+      else if ($__matcher_2->tag == "EMapLiteral") { 
+        $keys = $__matcher_2->params[0];
+        $values = $__matcher_2->params[1];
+        $isNative = $__matcher_2->params[2];
+        return $this->generateMapLiteral($keys, $values, $isNative);
+      }
+      else if ($__matcher_2->tag == "ELambda") { 
+        $func = $__matcher_2->params[0];
+        return $this->generateLambda($func);
+      }
       else if ($__matcher_2->tag == "EVariable") { 
         $name = $__matcher_2->params[0];
         return $this->generateVariable($name);
+      }
+      else if ($__matcher_2->tag == "EMatch") { 
+        $target = $__matcher_2->params[0];
+        $cases = $__matcher_2->params[1];
+        return "";
       }
       else {
         return "";
@@ -526,7 +624,9 @@ namespace Phase\Generator {
     protected function generateBlock(\Std\PhaseArray $stmts)
     {
       $out = new StringBuf();
-      return $out->add("{\n")->add($this->indent()->getIndent())->add($stmts->map(function ($it = null)
+      $out->add("{\n");
+      $this->indent();
+      return $out->add($stmts->map(function ($it = null)
       {
         return $this->generateStmt($it);
       })->join("\n"))->add("\n")->add($this->outdent()->getIndent())->add("}")->toString();
@@ -545,7 +645,7 @@ namespace Phase\Generator {
       switch ($op)
       {
         case "+":
-          if ($this->context->unify($left->type, $stringType))
+          if ($left->type != null && $this->context->unify($left->type, $stringType))
           {
             return $out->add(".")->add($this->generateExpr($right));
           }
@@ -555,6 +655,211 @@ namespace Phase\Generator {
           return $out->add($op)->add($this->generateExpr($right));
           break;
       }
+    }
+
+    protected function generateUnary(string $op, Expr $expr, Bool $isRight):string
+    {
+      return $isRight ? "" . ($op) . "" . ($this->generateExpr($expr)) . "" : "" . ($this->generateExpr($expr)) . "" . ($op) . "";
+    }
+
+    protected function generateCall(Expr $callee, \Std\PhaseArray $args):string
+    {
+      $def = $callee->expr;
+      $type = $callee->type;
+      $out = new StringBuf();
+      if ($type == null)
+      {
+        $type = Type::TAny();
+      }
+      $__matcher_8 = $type;
+      if ($__matcher_8->tag == "TInstance") { 
+        $_ = $__matcher_8->params[0];
+        $out->add("new " . ($this->generateExpr($callee)) . "");
+      }
+      else {
+        $__matcher_9 = $def;
+        if ($__matcher_9->tag == "EPath") { 
+          $_ = $__matcher_9->params[0];
+          $out->add("new " . ($this->generateExpr($callee)) . "");
+        }
+        else {
+          $out->add($this->generateExpr($callee));
+        };
+      };
+      return $out->add("(")->add($args->map(function (CallArgument $arg)
+      {
+        $__matcher_10 = $arg;
+        if ($__matcher_10->tag == "Positional") { 
+          $expr = $__matcher_10->params[0];
+          return $this->generateExpr($expr);
+        }
+        else if ($__matcher_10->tag == "Named") { 
+          $name = $__matcher_10->params[0];
+          $expr = $__matcher_10->params[1];
+          return "" . ($name) . ": " . ($this->generateExpr($expr)) . "";
+        }
+      })->join(", "))->add(")")->toString();
+    }
+
+    protected function generateGet(Expr $target, Expr $field):string
+    {
+      $targetType = $target->type;
+      $stringType = $this->context->getType("String");
+      $fieldDef = $field->expr;
+      if ($targetType != null && $this->context->unify($targetType, $stringType))
+      {
+        $name = $this->safeVar($field);
+        $expr = $this->generateExpr($target);
+        return "\\Std\\PhaseString::wrap(" . ($expr) . ")->" . ($name) . "";
+      }
+      $out = new StringBuf();
+      $out->add($this->generateExpr($target));
+      $name = "";
+      $__matcher_11 = $fieldDef;
+      if ($__matcher_11->tag == "EVariable") { 
+        $str = $__matcher_11->params[0];
+        $name = $str;
+      }
+      else {
+        $name = "{" . ($this->generateExpr($field)) . "}";
+      };
+      if ($targetType == null)
+      {
+        return $out->add("->")->add($name)->toString();
+      }
+      $__matcher_12 = $targetType;
+      if ($__matcher_12->tag == "TInstance") { 
+        $cls = $__matcher_12->params[0];
+        {
+          $f = $cls->fields->find(function ($it = null) use ($field)
+          {
+            return $it->name == $field;
+          });
+          $kind = $f->kind;
+          if ($f->access->contains(FieldAccess::AConst))
+          {
+            $out->add("::")->add($name);
+          }
+          else
+          {
+            if ($f->access->contains(FieldAccess::AStatic))
+            {
+              $out->add("::");
+              $__matcher_13 = $kind;
+              if ($__matcher_13->tag == "FVar") { 
+                $_ = $__matcher_13->params[0];
+                $_ = $__matcher_13->params[1];
+                $_ = $__matcher_13->params[2];
+                $out->add("$")->add($name);
+              }
+              else {
+                $out->add($name);
+              };
+            }
+            else
+            {
+              $out->add("->")->add($name);
+            }
+          }
+          return $out->toString();
+        }
+      }
+      else {
+        return $out->add("->")->add($name)->toString();
+      };
+    }
+
+    protected function generateSet(Expr $target, Expr $field, Expr $value):string
+    {
+      $out = new StringBuf();
+      $def = $field->expr;
+      return $out->add($this->generateGet($target, $field))->add(" = ")->add($this->generateExpr($value))->toString();
+    }
+
+    protected function generateArrayGet(Expr $target, ?Expr $field):string
+    {
+      $out = new StringBuf();
+      $out->add($this->generateExpr($target));
+      if ($field == null)
+      {
+        return $out->add("[]")->toString();
+      }
+      return $out->add("[")->add($this->generateExpr($field))->add("]")->toString();
+    }
+
+    protected function generateArraySet(Expr $target, ?Expr $field, Expr $value):string
+    {
+      $out = new StringBuf();
+      return $out->add($this->generateArraySet($target, $field))->add(" = ")->add($this->generateExpr($value))->toString();
+    }
+
+    protected function generateTernary(Expr $condition, Expr $thenBranch, Expr $elseBranch):string
+    {
+      $out = new StringBuf();
+      return $out->add($this->generateExpr($condition))->add(" ? ")->add($this->generateExpr($thenBranch))->add(" : ")->add($this->generateExpr($elseBranch))->toString();
+    }
+
+    protected function generateLiteral(Literal $literal):string
+    {
+      $__matcher_14 = $literal;
+      if ($__matcher_14->tag == "LNull") { 
+        return "null";
+      }
+      else if ($__matcher_14->tag == "LTrue") { 
+        return "true";
+      }
+      else if ($__matcher_14->tag == "LFalse") { 
+        return "false";
+      }
+      else if ($__matcher_14->tag == "LNumber") { 
+        $num = $__matcher_14->params[0];
+        return $num;
+      }
+      else if ($__matcher_14->tag == "LString") { 
+        $str = $__matcher_14->params[0];
+        return "\"" . (str_replace("\"", "//\"", $str)) . "\"";
+      }
+    }
+
+    protected function generateArrayLiteral(\Std\PhaseArray $exprs, Bool $isNative):string
+    {
+      $list = new StringBuf();
+      $list->add("[")->add($exprs->map(function ($it = null)
+      {
+        return $this->generateExpr($it);
+      })->join(", "))->add("]");
+      if ($isNative)
+      {
+        return $list->toString();
+      }
+      $out = new StringBuf();
+      $arr = static::$phaseToPhpTypes->get("Array");
+      return $out->add("new ")->add($arr)->add("(")->add($list->toString())->add(")")->toString();
+    }
+
+    protected function generateMapLiteral(\Std\PhaseArray $keys, \Std\PhaseArray $values, Bool $isNative):string
+    {
+      $out = new StringBuf();
+      $list = new \Std\PhaseArray([]);
+      $this->indent();
+      for ($i = 0; $i < $keys->length; $i++)
+      {
+        $item = new StringBuf();
+        $item->add($this->getIndent())->add($this->generateExpr($keys[$i]))->add(" => ")->add($this->generateExpr($values[$i]));
+        $list->push($item->toString());
+      }
+      $this->outdent();
+      $out->add("[")->add($list->join(",\n"))->add("\n")->add($this->getIndent())->add("]");
+      if ($isNative)
+      {
+        return $out->toString();
+      }
+      return "new " . (static::$phaseToPhpTypes->get("Map")) . "(" . ($out->toString()) . ")";
+    }
+
+    protected function generateLambda(FunctionDecl $func):string
+    {
+      return "";
     }
 
     protected function indent()
@@ -600,9 +905,9 @@ namespace Phase\Generator {
       {
         return "mixed";
       }
-      if (static::phaseToPhpTypes->contains($out))
+      if (static::$phaseToPhpTypes->contains($out))
       {
-        $out = static::phaseToPhpTypes->get($out);
+        $out = static::$phaseToPhpTypes->get($out);
         return $type->isNullable ? "?" . ($out) . "" : $out;
       }
       if ($type->isAbsolute)

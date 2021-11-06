@@ -515,6 +515,10 @@ namespace Phase {
       else if ($__matcher_3->tag == "EVariable") { 
         $name = $__matcher_3->params[0];
         {
+          if (!$this->scope->isDeclared($name))
+          {
+            $this->reporter->report($expr->pos, "Undeclared variable: " . ($name) . "");
+          }
           $expr->type = $this->scope->resolve($name);
         }
       }

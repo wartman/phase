@@ -491,7 +491,7 @@ class StaticAnalyzer
   }
 
   public function visitLambdaExpr(expr:Expr.Lambda):Void {
-    // todo
+    expr.func.accept(this);
   }
 
   public function visitNamespacedExpr(expr:Expr.Namespaced):Void {

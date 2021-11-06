@@ -658,9 +658,9 @@ namespace Phase {
             break;
         }
       }
-      if ($access->length == 0 || (!$access->contains(FieldAccess::APublic) && !$access->contains(FieldAccess::APrivate)))
+      if (!$access->contains(FieldAccess::APublic) && !$access->contains(FieldAccess::APrivate))
       {
-        $access->push(FieldAccess::APublic);
+        $addAccess(FieldAccess::APublic);
       }
       $name = $this->consume(TokenType::TokIdentifier, "Expected an identifier");
       $type = null;
@@ -1550,7 +1550,8 @@ namespace Phase {
           do
           {
             $name = $this->consume(TokenType::TokIdentifier, "Expect an argument name");
-            $args->push(new FunctionArg(name: $name->lexeme, type: null, expr: null));
+            $type = $this->matches(new \Std\PhaseArray([TokenType::TokColon])) ? $this->parseTypePath() : null;
+            $args->push(new FunctionArg(name: $name->lexeme, type: $type, expr: null));
           }
           while ($this->matches(new \Std\PhaseArray([TokenType::TokComma])));
         }

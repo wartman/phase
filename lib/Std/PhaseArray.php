@@ -80,7 +80,7 @@ namespace Std {
 
     public function contains($item):Bool
     {
-      return $this->indexOf($item) != -1;
+      return $this->indexOf($item) > -1;
     }
 
     public function indexOf($item):int

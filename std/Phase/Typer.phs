@@ -302,6 +302,9 @@ class Typer {
         expr.type = Type.TFun(func)
       }
       EVariable(name) -> {
+        if (!this.scope.isDeclared(name)) {
+          this.reporter.report(expr.pos, 'Undeclared variable: ${name}')
+        }
         expr.type = this.scope.resolve(name)
       }
       EMatch(target, cases) -> {

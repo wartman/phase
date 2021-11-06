@@ -756,8 +756,8 @@ class Parser {
       }
     }
 
-    if (access.length == 0 || (!access.contains(FieldAccess.APublic) && !access.contains(FieldAccess.APrivate))) {
-      access.push(FieldAccess.APublic)
+    if (!access.contains(FieldAccess.APublic) && !access.contains(FieldAccess.APrivate)) {
+      addAccess(FieldAccess.APublic)
     }
 
     var name: Token = this.consume(TokenType.TokIdentifier, 'Expected an identifier')
@@ -1896,9 +1896,10 @@ class Parser {
       if (!this.check(TokenType.TokBar)) {
         do {
           var name = this.consume(TokenType.TokIdentifier, "Expect an argument name")
+          var type = if (this.matches([ TokenType.TokColon ])) this.parseTypePath() else null
           args.push(FunctionArg(
             name: name.lexeme,
-            type: null,
+            type: type,
             expr: null
           ))
         } while (this.matches([ TokenType.TokComma ]))

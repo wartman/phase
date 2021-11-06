@@ -1328,9 +1328,11 @@ class Parser {
     if (match([ TokBar ])) {
       if (!check(TokBar)) {
         do {
+          var name = consume(TokIdentifier, 'Expect parameter name');
+          var type = if (match([TokColon])) parseTypePath() else null;
           params.push({
-            name: consume(TokIdentifier, 'Expect parameter name'),
-            type: null,
+            name: name,
+            type: type,
             expr: null
           });
         } while(match([ TokComma ]));

@@ -24,7 +24,8 @@ use Phase::Language::{
   FieldKind,
   ClassDecl,
   ClassKind,
-  MatchCase
+  MatchCase,
+  Type
 }
 
 class PhpGenerator implements Generator {
@@ -109,9 +110,29 @@ class PhpGenerator implements Generator {
     var def: ExprDef = expr.expr
     return match (def) {
       EAttribute(path, args) -> ''
-      EAssign(name, value) -> ''
+      EAssign(name, value) -> '$${this.safeVar(name)} = ${this.generateExpr(value)}'
       EBinary(left, op, right) -> this.generateBinary(left, op, right)
+      EUnary(op, expr, right) -> this.generateUnary(op, expr, right)
+      EIs(left, type) -> '${this.generateExpr(left)} instanceof ${this.phpTypePath(type)}'
+      ELogical(left, op, right) -> '${this.generateExpr(left)} ${op} ${this.generateExpr(right)}'
+      ERange(from, to) -> '' // @todo
+      ECall(callee, args) -> this.generateCall(callee, args)
+      EGet(target, field) -> this.generateGet(target, field)
+      ESet(target, field, value) -> this.generateSet(target, field, value)
+      EArrayGet(target, field) -> this.generateArrayGet(target, field)
+      EArraySet(target, field, value) -> this.generateArraySet(target, field, value)
+      ETernary(condition, thenBranch, elseBranch) -> this.generateTernary(condition, thenBranch, elseBranch)
+      ESuper(method) -> '' // todo
+      EPath(path) -> this.phpTypePath(path)
+      EThis() -> '\$this'
+      EStatic() -> 'static'
+      EGrouping(expr) -> '(${this.generateExpr(expr)})'
+      ELiteral(lit) -> this.generateLiteral(lit)
+      EArrayLiteral(values, isNative) -> this.generateArrayLiteral(values, isNative)
+      EMapLiteral(keys, values, isNative) -> this.generateMapLiteral(keys, values, isNative)
+      ELambda(func) -> this.generateLambda(func)
       EVariable(name) -> this.generateVariable(name)
+      EMatch(target, cases) -> '' // @todo
       default -> ''
     }
   }
@@ -412,9 +433,9 @@ class PhpGenerator implements Generator {
 
   private generateBlock(stmts: Array<Stmt>) {
     var out = StringBuf()
-    return out.add('{\n')
-      .add(this.indent().getIndent())
-      .add(stmts.map { this.generateStmt(it) }.join('\n'))
+    out.add('{\n')
+    this.indent()
+    return out.add(stmts.map { this.generateStmt(it) }.join('\n'))
       .add('\n')
       .add(this.outdent().getIndent())
       .add('}')
@@ -431,13 +452,187 @@ class PhpGenerator implements Generator {
     out.add(this.generateExpr(left))
     switch (op) {
       case '+': 
-        if (this.context.unify(left.type, stringType)) {
+        if (left.type != null && this.context.unify(left.type, stringType)) {
           return out.add('.').add(this.generateExpr(right))
         }
         return out.add('+').add(this.generateExpr(right))
       default:
         return out.add(op).add(this.generateExpr(right))
     }
+  }
+
+  private generateUnary(op: String, expr: Expr, isRight: Bool): String {
+    return if (isRight) 
+      '${op}${this.generateExpr(expr)}' 
+    else 
+      '${this.generateExpr(expr)}${op}'
+  }
+
+  private generateCall(callee: Expr, args: Array<CallArgument>): String {
+    var def: ExprDef = callee.expr
+    var type: Type = callee.type
+    var out = StringBuf()
+
+    if (type == null) type = Type.TAny()
+    
+    match (type) {
+      TInstance(_) -> out.add('new ${this.generateExpr(callee)}')
+      default -> match (def) {
+        EPath(_) -> out.add('new ${this.generateExpr(callee)}')
+        default -> out.add(this.generateExpr(callee))
+      }
+    }
+
+    return out.add('(')
+      .add(args.map { |arg: CallArgument| match (arg) {
+        Positional(expr) -> this.generateExpr(expr)
+        Named(name, expr) -> '${name}: ${this.generateExpr(expr)}'
+      }}.join(', '))
+      .add(')')
+      .toString()
+  }
+
+  private generateGet(target: Expr, field: Expr): String {
+    var targetType: ?Type = target.type
+    var stringType: Type = this.context.getType('String')
+    var fieldDef: ExprDef = field.expr
+
+    if (targetType != null && this.context.unify(targetType, stringType)) {
+      var name = this.safeVar(field)
+      var expr = this.generateExpr(target)
+      return '\\Std\\PhaseString::wrap(${expr})->${name}'
+    }
+
+    var out = StringBuf()
+    out.add(this.generateExpr(target))
+
+    var name: String = ''
+    match (fieldDef) {
+      EVariable(str) -> name = str
+      default -> name = '{${this.generateExpr(field)}}'
+    }
+
+    if (targetType == null) return out.add('->').add(name).toString()
+
+    match (targetType) {
+      TInstance(cls) -> {
+        var f: Field = cls.fields.find { it.name == field }
+        var kind: FieldKind = f.kind
+
+        if (f.access.contains(FieldAccess.AConst)) {
+          out.add('::').add(name)
+        } else if (f.access.contains(FieldAccess.AStatic)) {
+          out.add('::')
+          match (kind) {
+            FVar(_, _, _) -> out.add('$').add(name)
+            default -> out.add(name)
+          }
+        } else {
+          out.add('->').add(name)
+        }
+        return out.toString()
+      }
+      default -> return out.add('->').add(name).toString()
+    }
+  }
+
+  private generateSet(target: Expr, field: Expr, value: Expr): String {
+    var out = StringBuf()
+    var def: ExprDef = field.expr
+    return out.add(this.generateGet(target, field))
+      .add(' = ')
+      .add(this.generateExpr(value))
+      .toString()
+  }
+
+  private generateArrayGet(target: Expr, field: ?Expr): String {
+    var out = StringBuf()
+    out.add(this.generateExpr(target))
+    if (field == null) {
+      return out.add('[]').toString()
+    }
+    return out.add('[').add(this.generateExpr(field)).add(']').toString()
+  }
+
+  private generateArraySet(target: Expr, field: ?Expr, value: Expr): String {
+    var out = StringBuf()
+    return out.add(this.generateArraySet(target, field))
+      .add(' = ')
+      .add(this.generateExpr(value))
+      .toString()
+  }
+
+  private generateTernary(condition: Expr, thenBranch: Expr, elseBranch: Expr): String {
+    var out = StringBuf()
+    return out.add(this.generateExpr(condition))
+      .add(' ? ')
+      .add(this.generateExpr(thenBranch))
+      .add(' : ')
+      .add(this.generateExpr(elseBranch))
+      .toString()
+  }
+
+  private generateLiteral(literal: Literal): String {
+    return match (literal) {
+      LNull() -> 'null'
+      LTrue() -> 'true' 
+      LFalse() -> 'false'
+      LNumber(num) -> num
+      LString(str) -> '"' +++ ( str |> str_replace('"', '//"') ) +++ '"'
+    }
+  }
+
+  private generateArrayLiteral(exprs: Array<Expr>, isNative: Bool): String {
+    var list = StringBuf()
+    list.add('[')
+      .add(exprs.map { this.generateExpr(it) }.join(', '))
+      .add(']')
+
+    if (isNative) {
+      return list.toString()
+    }
+    
+    var out = StringBuf()
+    var arr = static.phaseToPhpTypes.get('Array')
+
+    return out
+      .add('new ')
+      .add(arr)
+      .add('(')
+      .add(list.toString())
+      .add(')')
+      .toString()
+  }
+
+  private generateMapLiteral(keys: Array<Expr>, values: Array<Expr>, isNative: Bool): String {
+    var out = StringBuf()
+    var list: Array<String> = []
+    this.indent()
+    for (i in 0..keys.length) {
+      var item = StringBuf()
+      item.add(this.getIndent())
+        .add(this.generateExpr(keys[i]))
+        .add(' => ')
+        .add(this.generateExpr(values[i]))
+      list.push(item.toString())
+    }
+    this.outdent()
+    out.add('[')
+      .add(list.join(',\n'))
+      .add('\n')
+      .add(this.getIndent())
+      .add(']')
+
+    if (isNative) {
+      return out.toString()
+    }
+
+    return 'new ${static.phaseToPhpTypes.get('Map')}(${out.toString()})'
+  }
+
+  private generateLambda(func: FunctionDecl): String {
+    // todo
+    return ''
   }
 
   private indent() {
