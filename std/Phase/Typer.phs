@@ -33,8 +33,7 @@ class Typer {
   private types: Map<String, Type>
   private reporter: ErrorReporter
   private scope: ?Scope = null
-  private ns: Array<String>
-  private typeLoader: TypeLoader
+  private ns: Array<String> = []
 
   new(
     this.stmts: Array<Stmt>,
@@ -103,17 +102,32 @@ class Typer {
     return this.types
   }
 
-  typeStmt(stmt: Stmt) {
+  typeStmt(stmt: ?Stmt) {
+    if (stmt == null) return
     var def: StmtDef = stmt.stmt
     match (def) {
+      SNamespace(path, decls, attrs) -> {
+        this.ns = path.ns.concat([ path.name ])
+        for (decl in decls) this.typeStmt(decl)
+      }
       SExpr(expr) -> this.typeExpr(expr)
       SUse(path, kind, attributes) -> this.typeUse(path, kind)
-      SVar(name, type, init) -> 
-        if (type != null) { 
-          this.scope.declare(name, type)
-          if (init != null) init.type = type 
+      SVar(name, type, init) -> {
+        var t: Type = Type.TAny()
+        if (type != null) t = this.resolve(type)
+        if (init != null) {
+          this.typeExpr(init)
+          match (t) {
+            TAny() -> {
+              if (type == null && init.type != null) t = init.type
+              // @todo: check that types unify
+            }
+            default -> null
+          }
         }
-      SGlobal(name) -> null
+        this.scope.declare(name, t)
+      }
+      SGlobal(name) -> this.scope.declare(name, Type.TAny())
       SThrow(expr) -> this.typeExpr(expr) 
       STry(body, catches) -> this.wrapScope {
         this.typeStmt(body)
@@ -139,7 +153,10 @@ class Typer {
       }
       SSwitch(target, cases) -> this.wrapScope {
         this.typeExpr(target)
-        for (item in cases) this.wrapScope { this.typeStmt(item) }
+        for (item in cases) this.wrapScope { 
+          this.typeExpr(item.condition)
+          item.body.map { this.typeStmt(it) }
+        }
       }
       SBlock(statements) -> this.wrapScope {
         for (item in statements) this.typeStmt(item)
@@ -157,7 +174,8 @@ class Typer {
     }
   }
 
-  typeExpr(expr: Expr) {
+  typeExpr(expr: ?Expr) {
+    if (expr == null) return
     var def: ExprDef = expr.expr
     match(def) {
       EAttribute(path, args) -> null // todo
@@ -212,22 +230,51 @@ class Typer {
               TFun(func) -> expr.type = this.resolve(func.ret)
               TInstance(cls) -> expr.type = Type.TInstance(cls)
               default -> null // Do we throw errors here?
-            }    
+            }
           }
           default -> null // Do we throw errors here?
         }
       }
       EGet(target, field) -> {
         this.typeExpr(target)
+        
         var type: Type = target.type
-        // @todo: resolve type from fields
+        var def: ExprDef = field.expr
+        expr.type = Type.TAny()
+
+        match (def) {
+          EVariable(name) -> match (type) {
+            TInstance(cls) -> {
+              var field: Field = cls.fields.find { it.name == name }
+              if (field == null) {
+                this.reporter.report(field.pos, "The class ${cls.name} does not have a field ${name}")
+                expr.type = Type.TAny()
+              } else {
+                match(field.kind) {
+                  FUse(_) -> expr.type = Type.TVoid()
+                  FVar(_, type, _) -> expr.type = this.resolve(type)
+                  FProp(_, _, type) -> expr.type = this.resolve(type)
+                  FFun(func) -> expr.type = Type.TFun(func)
+                }
+              }
+            }
+            default -> null // @todo: ???
+          }
+          default -> this.typeExpr(field) // more??
+        }
       }
       ESet(target, field, value) -> {
         this.typeExpr(target)
-        this.typeExpr(field)
         this.typeExpr(value)
-        // @todo: not sure what the type is here
-        expr.type = value.type
+
+        var def: ExprDef = field.expr
+        
+        match (def) {
+          EVariable(name) -> null // @todo: check that this is actaully on the class
+          default -> this.typeExpr(field) // more??
+        }
+
+        expr.type = Type.TVoid()
       }
       EArrayGet(target, field) -> {
         this.typeExpr(target)
@@ -257,14 +304,14 @@ class Typer {
       EThis() -> {
         var type = this.scope.resolve('this')
         if (type == null) {
-          // @todo: throw an error
+          this.reporter.report(expr.pos, "Used 'this' outside of a class declaration")
         }
         expr.type = type
       }
       EStatic() -> {
         var type = this.scope.resolve('static')
         if (type == null) {
-          // @todo: throw an error
+          this.reporter.report(expr.pos, "Used 'static' outside of a class declaration")
         }
         expr.type = type
       }
@@ -298,7 +345,7 @@ class Typer {
         expr.type = this.resolve(TypePath(ns: [], name: name, isAbsolute: true))
       }
       ELambda(func) -> {
-        this.typeStmt(func)
+        this.typeFunction(func)
         expr.type = Type.TFun(func)
       }
       EVariable(name) -> {
@@ -364,34 +411,43 @@ class Typer {
     }
   }
 
-  typeFunction(fun: FunctionDecl) {
+  typeFunction(decl: FunctionDecl) {
     this.scope.declare(decl.name, Type.TFun(decl))
     this.wrapScope {
       for (arg in decl.args) {
-        if (arg.type != null) this.scope.declare(arg.name, this.resolve(arg.type))
+        var t: Type = if (arg.type != null) this.resolve(arg.type) else Type.TAny()
+        if (arg.expr != null) {
+          this.typeExpr(arg.expr)
+          if (arg.expr.type != null) match(t) {
+            TAny() -> t = arg.expr.type
+            default -> null // @todo: check that type unifies
+          }
+        }
+        this.scope.declare(arg.name, t)
       }
-      this.typeStmt(decl.stmt)
+      this.typeStmt(decl.body)
     }
   }
 
   typeField(field: Field, cls: ClassDecl) {
     var kind: FieldKind = field.kind
     match (kind) {
-      FUse(type) -> null // todo: we'll need to load this type
+      FUse(type) -> null
       FVar(name, type, initializer) -> {
-        // what to do with the type?
+        if (initializer != null) this.typeExpr(initializer)
+        // @todo: ensure `type` unifies with `initializer`
       }
       FProp(getter, setter, type) -> {
         this.typeFunction(getter)
         this.typeFunction(setter)
-        // what to do with the type?
+        // @todo: ensure getter and setter unifies with type
       }
       FFun(fun) -> this.typeFunction(fun)
     }
   }
 
   private resolve(path: ?TypePath): Type {
-    if (path == null) return Type.TAny
+    if (path == null) return Type.TAny()
 
     var name = path.toString()
     var type = this.scope.resolve(name)
@@ -412,11 +468,7 @@ class Typer {
       return resolve(local)
     }
 
-    var type = this.typeLoader.load(path.toString())
-    if (type == null) {
-      return Type.TUnknown(path)
-    }
-    return type
+    return Type.TUnknown(path)
   }
 
   private wrapScope(cb: Callable) {

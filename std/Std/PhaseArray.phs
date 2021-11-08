@@ -56,9 +56,9 @@ class PhaseArray
     return out
   }
 
-  contains(item): Bool {
-    return this.indexOf(item) > -1
-  }
+  contains(item): Bool { this.indexOf(item) > -1 }
+
+  exists(elt): Bool { this.find(elt) != null }
 
   indexOf(item): Int {
     var index = array_search(item, this.data, true)

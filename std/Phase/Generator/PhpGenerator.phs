@@ -4,7 +4,8 @@ use Std::StringBuf
 use Phase::{
   ErrorReporter,
   Generator,
-  Context
+  Context,
+  CodeGenerator
 }
 use Phase::Language::{
   Position,
@@ -239,7 +240,17 @@ class PhpGenerator implements Generator {
   }
 
   private generateFuncitionArgs(args: Array<FunctionArg>): String {
-    return ''
+    return args.map { |arg:FunctionArg|
+      var out = StringBuf()
+      if (arg.type != null) {
+        out.add(this.phpTypePath(arg.type)).add(' ')
+      }
+      out.add('$').add(this.safeVar(arg.name))
+      if (arg.expr != null) {
+        out.add(' = ').add(this.generateExpr(arg.expr))
+      }
+      return out.toString()
+    }.join(', ')
   }
 
   private generateClass(decl: ClassDecl): String {
@@ -273,7 +284,7 @@ class PhpGenerator implements Generator {
       out.add(keyword).add(decl.interfaces.map { it.toString() }.join(', '))
     }
 
-    out.add('\n').add(this.getIndent()).add('{\n')
+    out.add('\n').add(this.getIndent()).add('{')
     this.indent()
 
     var prevMode = this.mode
@@ -290,7 +301,7 @@ class PhpGenerator implements Generator {
     for (field in decl.fields) {
       var kind: FieldKind = field.kind
       if (field == constructor) continue
-      if (this.mode = PhpGeneratorMode.GeneratingInterface) match (kind) {
+      if (this.mode == PhpGeneratorMode.GeneratingInterface) match (kind) {
         FVar(_, _, _) -> continue
         FProp(_, _, _) -> continue
         default -> null
@@ -305,6 +316,13 @@ class PhpGenerator implements Generator {
       body.add(this.generateField(field, classLocalInits, classStaticInits))
     }
 
+    if (constructor != null) {
+      if (classLocalInits.length > 0) {
+        // @todo
+      }
+    }
+
+    if (constructor != null) out.add(this.generateField(constructor, [], []))
     out.add(body.toString())
 
     this.outdent()
@@ -319,7 +337,7 @@ class PhpGenerator implements Generator {
     localInits: Array<String>,
     staticInits: Array<String>
   ): String {
-    var isConst: Bool = false
+    var isConst: Bool = field.access.contains(FieldAccess.AConst)
     var out = (StringBuf()).add('\n').add(this.getIndent())
     var kind: FieldKind = field.kind
     var access = field.access.map {
@@ -330,9 +348,8 @@ class PhpGenerator implements Generator {
           return 'public'
         case FieldAccess.APrivate: 
           return 'protected'
-        case FieldAccess.AConst: 
-          isConst = true
-          'const'
+        case FieldAccess.AConst:
+          return 'const'
         case FieldAccess.AAbstract: 
           return if (this.mode == PhpGeneratorMode.GeneratingInterface) null else 'abstract'
       }
@@ -344,11 +361,11 @@ class PhpGenerator implements Generator {
         var name = this.safeVar(field.name)
         ret.add(access)
         if (this.config.phpVersion >= 8) {
-          if (type != null && !isConst) out.add(' ').add(type.toString())
+          if (type != null && !isConst) ret.add(' ').add(type.toString())
         }
-        out.add(if (isConst) ' ' else '$').add(name)
+        ret.add(if (isConst) ' ' else ' $').add(name)
         if (init != null) {
-          if (isConst) out.add(' = ').add(this.generateExpr(init))
+          if (isConst) ret.add(' = ').add(this.generateExpr(init))
         } else if (field.access.contains(FieldAccess.AStatic)) {
           staticInits.push('$${name} = ${this.generateExpr(init)}')
         } else {
@@ -374,8 +391,9 @@ class PhpGenerator implements Generator {
         if (!field.access.contains(FieldAccess.AAbstract)) {
           for (p in func.args) {
             if (p.isInit) {
+              p.isInit = false
               var init = CodeGenerator.generateStmt(
-                'this.${p.name} = ${p.name}',
+                'this.${p.name} = ${p.name};',
                 field.pos,
                 this.reporter
               )
@@ -493,7 +511,7 @@ class PhpGenerator implements Generator {
   }
 
   private generateGet(target: Expr, field: Expr): String {
-    var targetType: ?Type = target.type
+    var targetType: ?Type = this.resolveType(target.type)
     var stringType: Type = this.context.getType('String')
     var fieldDef: ExprDef = field.expr
 
@@ -516,7 +534,7 @@ class PhpGenerator implements Generator {
 
     match (targetType) {
       TInstance(cls) -> {
-        var f: Field = cls.fields.find { it.name == field }
+        var f: Field = cls.fields.find { it.name == name }
         var kind: FieldKind = f.kind
 
         if (f.access.contains(FieldAccess.AConst)) {
@@ -530,6 +548,7 @@ class PhpGenerator implements Generator {
         } else {
           out.add('->').add(name)
         }
+
         return out.toString()
       }
       default -> return out.add('->').add(name).toString()
@@ -578,7 +597,7 @@ class PhpGenerator implements Generator {
       LTrue() -> 'true' 
       LFalse() -> 'false'
       LNumber(num) -> num
-      LString(str) -> '"' +++ ( str |> str_replace('"', '//"') ) +++ '"'
+      LString(str) -> '"' +++ ( str |> str_replace('"', '\\"') ) +++ '"'
     }
   }
 
@@ -593,7 +612,7 @@ class PhpGenerator implements Generator {
     }
     
     var out = StringBuf()
-    var arr = static.phaseToPhpTypes.get('Array')
+    var arr = static.phaseToPhpTypes['Array']
 
     return out
       .add('new ')
@@ -677,5 +696,13 @@ class PhpGenerator implements Generator {
       out = '?${out}'
     }
     return out
+  }
+
+  private resolveType(type: ?Type): ?Type {
+    if (type == null) return null
+    match (type) {
+      TUnknown(path) -> return if (path != null) this.context.getType(path.toString()) else Type.TAny()
+      default -> return type
+    }
   }
 }

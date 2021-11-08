@@ -25,7 +25,7 @@ namespace Phase\Reporter {
       while ($start > 0)
       {
         $t = $content[--$start];
-        if ($t == "\n")
+        if ($t === "\n")
         {
           break;
         }
@@ -38,7 +38,7 @@ namespace Phase\Reporter {
       while ($end <= (new \Std\PhaseString($content))->length)
       {
         $t = $content[$end++];
-        if ($t == "\n")
+        if ($t === "\n")
         {
           break;
         }

@@ -1,6 +1,6 @@
 namespace Phase
 
-use Phase::Language::Type
+use Phase::Language::{ Type, TypePath }
 
 class Context {
   new (
@@ -21,7 +21,7 @@ class Context {
     if (this.types.contains(name)) {
       return this.types.get(name)
     }
-    var type = this.loader.load(name)
+    var type = this.loader.load(TypePath.of(name))
     if (type != null) {
       this.types.set(name, type)
       return type

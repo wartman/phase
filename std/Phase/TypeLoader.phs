@@ -1,11 +1,30 @@
 namespace Phase
 
-use Phase::Language::Type
+use Std::Io::Path
+use Phase::Language::{ Type, TypePath }
+use Phase::Reporter::DefaultErrorReporter
 
 class TypeLoader {
-  new(this.root: String) {}
+  private root: Path
 
-  load(path: String): ?Type {
+  new(root: String) {
+    this.root = Path(root)
+  }
+
+  load(tp: TypePath): ?Type {
+    var name = tp.toFileName()
+    var typeName = tp.notAbsolute().toString() 
+    var path = this.root.with(name).withExtension('phs')
+    var content = path.toString() |> file_get_contents()
+    var source = Source(file: path, content: content)
+    var reporter = DefaultErrorReporter(source)
+    var scanner = Scanner(source, reporter)
+    var parser = Parser(scanner.scan(), reporter)
+    var typer = Typer(parser.parse(), reporter)
+    var types = typer.typeSurface()
+
+    if (types.contains(typeName)) return types.get(typeName)
+
     return Type.TUnknown(null)
   }
 }

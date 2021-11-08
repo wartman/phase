@@ -4,7 +4,7 @@ class FunctionDecl {
   new(
     this.name: String,
     this.args: Array<FunctionArg>,
-    this.body: Stmt,
+    this.body: ?Stmt,
     this.ret: ?TypePath,
     this.attributes: Array<Expr>
   ) {}

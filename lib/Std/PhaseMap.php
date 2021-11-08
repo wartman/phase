@@ -87,7 +87,7 @@ namespace Std {
 
     public function offsetSet($offset, $value)
     {
-      if ($offset == null)
+      if ($offset === null)
       {
         throw new InvalidArgumentException();
       }

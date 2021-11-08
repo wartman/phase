@@ -40,7 +40,7 @@ namespace Std {
     public function substring(int $startIndex, ?int $endIndex = null):string
     {
       $str = $this->value;
-      if ($endIndex == null)
+      if ($endIndex === null)
       {
         if ($startIndex < 0)
         {

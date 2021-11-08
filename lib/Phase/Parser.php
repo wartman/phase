@@ -53,7 +53,7 @@ namespace Phase {
       while (!$this->isAtEnd())
       {
         $stmt = $this->declaration();
-        if ($stmt != null)
+        if ($stmt !== null)
         {
           $statements->push($stmt);
         }
@@ -63,7 +63,7 @@ namespace Phase {
 
     public function declaration(?\Std\PhaseArray $attributes = null):Stmt
     {
-      if ($attributes == null)
+      if ($attributes === null)
       {
         $attributes = new \Std\PhaseArray([]);
       }
@@ -245,7 +245,7 @@ namespace Phase {
                 if ($this->matches(new \Std\PhaseArray([TokenType::TokTypeIdentifier, TokenType::TokIdentifier])))
                 {
                   $tok = $this->previous();
-                  return $tok->type == TokenType::TokIdentifier ? UseTarget::TargetFunction($tok->lexeme) : UseTarget::TargetType($tok->lexeme);
+                  return $tok->type === TokenType::TokIdentifier ? UseTarget::TargetFunction($tok->lexeme) : UseTarget::TargetType($tok->lexeme);
                 }
                 else
                 {
@@ -271,9 +271,9 @@ namespace Phase {
         {
           $tok = $this->previous();
           $__matcher_1 = $kind;
-          if ($__matcher_1->tag == "UseSub") { 
+          if ($__matcher_1->tag === "UseSub") { 
             $items = $__matcher_1->params[0];
-            if ($items->length == 1 && $items[0]->tag == "TargetFunction")
+            if ($items->length === 1 && $items[0]->tag === "TargetFunction")
             {
               $p = $items[0]->params[0];
               $path->push($p);
@@ -282,7 +282,7 @@ namespace Phase {
           else {
             null;
           };
-          $kind = UseKind::UseAlias($tok->type == TokIdentifier ? UseTarget::TargetFunction($tok->lexeme) : UseTarget::TargetType($tok->lexeme));
+          $kind = UseKind::UseAlias($tok->type === TokIdentifier ? UseTarget::TargetFunction($tok->lexeme) : UseTarget::TargetType($tok->lexeme));
         }
         else
         {
@@ -320,7 +320,7 @@ namespace Phase {
 
     protected function functionDecl(Bool $isAnnon, \Std\PhaseArray $attributes):FunctionDecl
     {
-      if ($attributes == null)
+      if ($attributes === null)
       {
         $attributes = new \Std\PhaseArray([]);
       }
@@ -430,9 +430,9 @@ namespace Phase {
       while ($this->matches(new \Std\PhaseArray([TokenType::TokExtends, TokenType::TokImplements])) && !$this->isAtEnd())
       {
         $op = $this->previous();
-        if ($op == TokenType::TokExtends)
+        if ($op === TokenType::TokExtends)
         {
-          if ($superclass != null)
+          if ($superclass !== null)
           {
             throw $this->error($op, "Can only extend once");
           }
@@ -452,13 +452,16 @@ namespace Phase {
         $field = $this->fieldDeclaration();
         $kind = $field->kind;
         $__matcher_2 = $kind;
-        if ($__matcher_2->tag == "FFun") { 
+        if ($__matcher_2->tag === "FFun") { 
           $func = $__matcher_2->params[0];
           foreach ($func->args as $a)
           {
-            if ($a->isInit == true && !(isset($fields[$a->name])))
+            if ($a->isInit === true && !$fields->exists(function ($it = null) use ($a)
             {
-              $fields->push(new Field(name: $a->name, kind: FieldKind::FVar(name: $a->name, type: $a->type, initializer: null), type: $a->type, access: new \Std\PhaseArray([FieldAccess::APublic]), attributes: new \Std\PhaseArray([]), pos: $this->previous()->pos));
+              return $it->name === $a->name;
+            }))
+            {
+              $fields->push(new Field(name: $a->name, kind: FieldKind::FVar(name: $a->name, type: $a->type, initializer: null), access: new \Std\PhaseArray([FieldAccess::APublic]), attributes: new \Std\PhaseArray([]), pos: $this->previous()->pos));
             }
           }
         }
@@ -491,7 +494,7 @@ namespace Phase {
       while (!$this->check(TokenType::TokRightBrace) && !$this->isAtEnd())
       {
         $this->ignoreNewlines();
-        $field = $this->fieldDeclaration();
+        $field = $this->fieldDeclaration(true);
         if (!$field->access->contains(FieldAccess::AAbstract))
         {
           $field->access->push(FieldAccess::AAbstract);
@@ -561,7 +564,7 @@ namespace Phase {
           }
           $index++;
           $this->expectEndOfStatement();
-          $fields->push(new Field(name: $fieldName->lexeme, type: null, kind: FieldKind::FVar($fieldName->lexeme, null, $value, null), access: new \Std\PhaseArray([FieldAccess::AConst]), attributes: new \Std\PhaseArray([])));
+          $fields->push(new Field(name: $fieldName->lexeme, kind: FieldKind::FVar($fieldName->lexeme, null, $value, null), access: new \Std\PhaseArray([FieldAccess::AConst]), attributes: new \Std\PhaseArray([]), pos: $fieldName->pos->merge($this->previous()->pos)));
         }
         $this->ignoreNewlines();
         $this->consume(TokenType::TokRightBrace, "Expect '}' at end of enum body");
@@ -599,7 +602,7 @@ namespace Phase {
       return new Stmt(stmt: StmtDef::SClass(new ClassDecl(name: $enumName->lexeme, kind: ClassKind::KindClass, params: $params, superclass: new TypePath(ns: new \Std\PhaseArray(["Std"]), name: "PhaseEnum", params: new \Std\PhaseArray([]), isAbsolute: true, isNullable: false), interfaces: new \Std\PhaseArray([]), fields: $fields, attributes: $attributes)), pos: $start->pos->merge($this->previous()->pos));
     }
 
-    protected function fieldDeclaration():Field
+    protected function fieldDeclaration(Bool $isInterface = false):Field
     {
       $start = $this->previous();
       if ($this->matches(new \Std\PhaseArray([TokenType::TokUse])))
@@ -671,7 +674,7 @@ namespace Phase {
       if ($this->matches(new \Std\PhaseArray([TokenType::TokNewline])))
       {
         $this->ignoreNewlines();
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: null), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
+        return new Field(name: $name->lexeme, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: null), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftBrace])))
       {
@@ -684,7 +687,7 @@ namespace Phase {
           switch ($mode->lexeme)
           {
             case "get":
-              if ($getter != null)
+              if ($getter !== null)
               {
                 throw $this->error($mode, "`get` already defined");
               }
@@ -694,7 +697,7 @@ namespace Phase {
               $getter = new FunctionDecl(name: $mode->lexeme, args: new \Std\PhaseArray([]), body: $body, ret: $type, attributes: new \Std\PhaseArray([]));
               break;
             case "set":
-              if ($setter != null)
+              if ($setter !== null)
               {
                 throw $this->error($mode, "`set` already defined");
               }
@@ -710,7 +713,7 @@ namespace Phase {
         }
         $this->ignoreNewlines();
         $this->consume(TokenType::TokRightBrace, "Expected a `}`");
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FProp(getter: $getter, setter: $setter, type: $type), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
+        return new Field(name: $name->lexeme, access: $access, kind: FieldKind::FProp(getter: $getter, setter: $setter, type: $type), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       if ($this->matches(new \Std\PhaseArray([TokenType::TokEqual])))
       {
@@ -721,17 +724,17 @@ namespace Phase {
         $this->ignoreNewlines();
         $expr = $this->expression();
         $this->expectEndOfStatement();
-        return new Field(name: $name->lexeme, type: $type, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $expr), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
+        return new Field(name: $name->lexeme, access: $access, kind: FieldKind::FVar(name: $name->lexeme, type: $type, initializer: $expr), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
       }
       $this->consume(TokenType::TokLeftParen, "Expect '(' after function name.");
-      $args = $this->functionArgs($name->lexeme == "new");
+      $args = $this->functionArgs($name->lexeme === "new");
       $type = null;
       $body = null;
       if ($this->matches(new \Std\PhaseArray([TokenType::TokColon])))
       {
         $type = $this->parseTypePath();
       }
-      if ($access->contains(FieldAccess::AAbstract))
+      if ($access->contains(FieldAccess::AAbstract) || $isInterface)
       {
         $this->expectEndOfStatement();
       }
@@ -741,7 +744,7 @@ namespace Phase {
         $body = $this->functionBody();
         $this->expectEndOfStatement();
       }
-      return new Field(name: $name->lexeme, access: $access, type: $type, kind: FieldKind::FFun(new FunctionDecl(name: $name->lexeme, args: $args, body: $body, ret: $type, attributes: new \Std\PhaseArray([]))), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
+      return new Field(name: $name->lexeme, access: $access, kind: FieldKind::FFun(new FunctionDecl(name: $name->lexeme, args: $args, body: $body, ret: $type, attributes: new \Std\PhaseArray([]))), attributes: $attributes, pos: $start->pos->merge($this->previous()->pos));
     }
 
     protected function attributeList():\Std\PhaseArray
@@ -750,24 +753,21 @@ namespace Phase {
       $start = $this->previous();
       do
       {
-        $path = $this->parseList(TokenType::TokScopeResolutionOperator, function ($it = null)
-        {
-          return $this->consume(TokenType::TokTypeIdentifier, "Expect a package name seperated by '::'");
-        });
+        $path = $this->parseTypePath(false);
         $args = new \Std\PhaseArray([]);
         if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftParen])))
         {
           if (!$this->matches(new \Std\PhaseArray([TokenType::TokRightParen])))
           {
             $args = $this->parseArguments();
+            $this->ignoreNewlines();
+            $this->consume(TokenType::TokRightParen, "Expect ')' at the end of an attribute");
           }
-          $this->ignoreNewlines();
-          $this->consume(TokenType::TokRightParen, "Expect ')' at the end of an attribute");
         }
         $this->ignoreNewlines();
         $attributes->push(new Expr(expr: ExprDef::EAttribute(path: $path, args: $args), pos: $start->pos->merge($this->previous()->pos)));
       }
-      while ($this->matches(new \Std\PhaseArray([TokenType::TokComma])));
+      while ($this->matches(new \Std\PhaseArray([TokenType::TokComma])) && !$this->isAtEnd());
       $this->consume(TokenType::TokRightBracket, "Expect a ']' at the end of an attribute");
       $this->ignoreNewlines();
       if ($this->matches(new \Std\PhaseArray([TokenType::TokLeftBracket])))
@@ -816,7 +816,7 @@ namespace Phase {
       $thenBranch = $this->statement();
       $def = $thenBranch->stmt;
       $__matcher_3 = $def;
-      if ($__matcher_3->tag == "SBlock") { 
+      if ($__matcher_3->tag === "SBlock") { 
         $_ = $__matcher_3->params[0];
         null;
       }
@@ -829,7 +829,7 @@ namespace Phase {
         $elseBranch = $this->statement();
         $def = $elseBranch->stmt;
         $__matcher_4 = $def;
-        if ($__matcher_4->tag == "SBlock") { 
+        if ($__matcher_4->tag === "SBlock") { 
           $_ = $__matcher_4->params[0];
           null;
         }
@@ -899,7 +899,7 @@ namespace Phase {
         $this->ignoreNewlines();
         $condition = null;
         $isDefault = false;
-        if ($this->previous()->type == TokenType::TokDefault)
+        if ($this->previous()->type === TokenType::TokDefault)
         {
           $isDefault = true;
         }
@@ -1019,16 +1019,16 @@ namespace Phase {
         $value = $this->assignment();
         $def = $expr->expr;
         $__matcher_5 = $def;
-        if ($__matcher_5->tag == "EVariable") { 
+        if ($__matcher_5->tag === "EVariable") { 
           $name = $__matcher_5->params[0];
           return new Expr(expr: ExprDef::EAssign($name, $value), pos: $expr->pos->merge($value->pos));
         }
-        else if ($__matcher_5->tag == "EGet") { 
+        else if ($__matcher_5->tag === "EGet") { 
           $target = $__matcher_5->params[0];
           $field = $__matcher_5->params[1];
           return new Expr(expr: ExprDef::ESet($target, $field, $value), pos: $expr->pos->merge($value->pos));
         }
-        else if ($__matcher_5->tag == "EArrayGet") { 
+        else if ($__matcher_5->tag === "EArrayGet") { 
           $target = $__matcher_5->params[0];
           $field = $__matcher_5->params[1];
           return new Expr(expr: ExprDef::EArraySet($target, $field, $value), pos: $expr->pos->merge($value->pos));
@@ -1045,10 +1045,10 @@ namespace Phase {
       $expr = $this->and();
       while ($this->matches(new \Std\PhaseArray([TokenType::TokBoolOr])))
       {
-        $op = $this->previous();
+        $op = $this->previous()->lexeme;
         $this->ignoreNewlines();
         $right = $this->and();
-        $expr = new Expr(expr: ExprDef::ELogical($expr, $op->lexeme, $right), pos: $expr->pos->merge($right->pos));
+        $expr = new Expr(expr: ExprDef::ELogical($expr, $op, $right), pos: $expr->pos->merge($right->pos));
       }
       return $expr;
     }
@@ -1074,7 +1074,7 @@ namespace Phase {
         $op = $this->previous();
         $this->ignoreNewlines();
         $right = $this->comparison();
-        $expr = new Expr(expr: ExprDef::EBinary($expr, $op->lexeme, $right), pos: $expr->pos->merge($right->pos));
+        $expr = new Expr(expr: ExprDef::EBinary($expr, $op->type, $right), pos: $expr->pos->merge($right->pos));
       }
       return $expr;
     }
@@ -1146,14 +1146,14 @@ namespace Phase {
         $target = $this->unary();
         $def = $target->expr;
         $__matcher_6 = $def;
-        if ($__matcher_6->tag == "ECall") { 
+        if ($__matcher_6->tag === "ECall") { 
           $callee = $__matcher_6->params[0];
           $args = $__matcher_6->params[1];
           {
             $expr = new Expr(expr: ExprDef::ECall($callee, $args->concat(new \Std\PhaseArray([CallArgument::Positional($expr)]))), pos: $target->pos);
           }
         }
-        else if ($__matcher_6->tag == "ELambda") { 
+        else if ($__matcher_6->tag === "ELambda") { 
           $func = $__matcher_6->params[0];
           {
             $expr = new Expr(expr: ExprDef::ECall(new Expr(expr: ExprDef::EGrouping($target), pos: $target->pos), new \Std\PhaseArray([CallArgument::Positional($expr)])), pos: $target->pos);
@@ -1213,10 +1213,10 @@ namespace Phase {
                 $ret = $this->expression();
                 $def = $ret->expr;
                 $__matcher_7 = $def;
-                if ($__matcher_7->tag == "EVariable") { 
+                if ($__matcher_7->tag === "EVariable") { 
                   $_ = $__matcher_7->params[0];
                   {
-                    $ret = ExprDef::Expr(expr: new EGrouping($ret), pos: $ret->pos);
+                    $ret = new Expr(expr: ExprDef::EGrouping($ret), pos: $ret->pos);
                   }
                 }
                 else {
@@ -1697,7 +1697,7 @@ namespace Phase {
       {
         return false;
       }
-      return $this->peek()->type == $type;
+      return $this->peek()->type === $type;
     }
 
     protected function checkNext(string $type):Bool
@@ -1706,7 +1706,7 @@ namespace Phase {
       {
         return false;
       }
-      return $this->peekNext()->type == $type;
+      return $this->peekNext()->type === $type;
     }
 
     protected function advance():?Token
@@ -1735,7 +1735,7 @@ namespace Phase {
 
     protected function isAtEnd():Bool
     {
-      return $this->peek()->type == TokenType::TokEof;
+      return $this->peek()->type === TokenType::TokEof;
     }
 
     protected function error(Token $token, string $message)

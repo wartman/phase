@@ -5,7 +5,7 @@ namespace Phase\Language {
   class FunctionDecl
   {
 
-    public function __construct(string $name, \Std\PhaseArray $args, Stmt $body, ?TypePath $ret, \Std\PhaseArray $attributes)
+    public function __construct(string $name, \Std\PhaseArray $args, ?Stmt $body, ?TypePath $ret, \Std\PhaseArray $attributes)
     {
       $this->attributes = $attributes;
       $this->ret = $ret;
@@ -18,7 +18,7 @@ namespace Phase\Language {
 
     public \Std\PhaseArray $args;
 
-    public Stmt $body;
+    public ?Stmt $body;
 
     public ?TypePath $ret;
 

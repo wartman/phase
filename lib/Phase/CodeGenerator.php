@@ -19,7 +19,7 @@ namespace Phase {
     static public function generateStmt(string $code, Position $pos, ErrorReporter $reporter):Stmt
     {
       $stmts = static::generate($code, $pos, $reporter);
-      if ($stmts->length != 1)
+      if ($stmts->length !== 1)
       {
         $reporter->report($pos, "Expected a single statement");
         throw new ParserException();
@@ -30,14 +30,14 @@ namespace Phase {
     static public function generateExpr(string $code, Position $pos, ErrorReporter $reporter):Expr
     {
       $stmts = static::generate($code, $pos, $reporter);
-      if ($stmts->length != 1)
+      if ($stmts->length !== 1)
       {
         $reporter->report($pos, "Expected a single expression");
         throw new ParserException();
       }
       $stmt = $stmts[0]->stmt;
       $__matcher_1 = $stmt;
-      if ($__matcher_1->tag == "SExpr") { 
+      if ($__matcher_1->tag === "SExpr") { 
         $expr = $__matcher_1->params[0];
         return $expr;
       }

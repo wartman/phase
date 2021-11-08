@@ -450,7 +450,7 @@ class Parser {
         FFun(func) -> for (a in func.args) {
           if (
             a.isInit == true
-            && ! (fields[a.name] |> isset())
+            && !fields.exists { it.name == a.name }
           ) {
             fields.push(Field(
               name: a.name,
@@ -459,7 +459,6 @@ class Parser {
                 type: a.type,
                 initializer: null
               ),
-              type: a.type,
               access: [ FieldAccess.APublic ],
               attributes: [],
               pos: this.previous().pos
@@ -508,7 +507,7 @@ class Parser {
     
     while (!this.check(TokenType.TokRightBrace) && !this.isAtEnd()) {
       this.ignoreNewlines()
-      var field = this.fieldDeclaration()
+      var field = this.fieldDeclaration(true)
       if (!field.access.contains(FieldAccess.AAbstract)) {
         field.access.push(FieldAccess.AAbstract)
       }
@@ -600,10 +599,10 @@ class Parser {
         this.expectEndOfStatement()
         fields.push(Field(
           name: fieldName.lexeme,
-          type: null,
           kind: FieldKind.FVar(fieldName.lexeme, null, value, null),
           access: [ FieldAccess.AConst ],
-          attributes: []
+          attributes: [],
+          pos: fieldName.pos.merge(this.previous().pos)
         ))
       }
   
@@ -687,7 +686,7 @@ class Parser {
     )
   }
 
-  private fieldDeclaration(): Field {
+  private fieldDeclaration(isInterface: Bool = false): Field {
     var start = this.previous()
     if (this.matches([ TokenType.TokUse ])) {
       // Note: this will need to get more complex later.
@@ -771,7 +770,6 @@ class Parser {
       this.ignoreNewlines()
       return Field(
         name: name.lexeme,
-        type: type,
         access: access,
         kind: FieldKind.FVar(
           name: name.lexeme,
@@ -835,7 +833,6 @@ class Parser {
       this.consume(TokenType.TokRightBrace, 'Expected a `}`')
       return Field(
         name: name.lexeme,
-        type: type,
         access: access,
         kind: FieldKind.FProp(
           getter: getter,
@@ -857,7 +854,6 @@ class Parser {
       this.expectEndOfStatement()
       return Field(
         name: name.lexeme,
-        type: type,
         access: access,
         kind: FieldKind.FVar(
           name: name.lexeme,
@@ -878,7 +874,7 @@ class Parser {
       type = this.parseTypePath()
     }
 
-    if (access.contains(FieldAccess.AAbstract)) {
+    if (access.contains(FieldAccess.AAbstract) || isInterface) {
       this.expectEndOfStatement()
     } else {
       this.consume(TokenType.TokLeftBrace, "Expect '{' before function body")
@@ -889,7 +885,6 @@ class Parser {
     return Field(
       name: name.lexeme,
       access: access,
-      type: type,
       kind: FieldKind.FFun(FunctionDecl(
         name: name.lexeme,
         args: args,
@@ -907,16 +902,14 @@ class Parser {
     var start = this.previous()
 
     do {
-      var path: TypePath = this.parseList(TokenType.TokScopeResolutionOperator) {
-        return this.consume(TokenType.TokTypeIdentifier, "Expect a package name seperated by '::'")
-      }
+      var path: TypePath = this.parseTypePath(false)
       var args: Array<CallArgument> = []
       if (this.matches([ TokenType.TokLeftParen ])) {
         if (!this.matches([ TokenType.TokRightParen ])) {
           args = this.parseArguments()
+          this.ignoreNewlines()
+          this.consume(TokenType.TokRightParen, "Expect ')' at the end of an attribute")
         }
-        this.ignoreNewlines()
-        this.consume(TokenType.TokRightParen, "Expect ')' at the end of an attribute")
       }
       this.ignoreNewlines()
       attributes.push(Expr(
@@ -926,7 +919,7 @@ class Parser {
         ),
         pos: start.pos.merge(this.previous().pos)
       ))
-    } while (this.matches([ TokenType.TokComma ]))
+    } while (this.matches([ TokenType.TokComma ]) && !this.isAtEnd())
     
     this.consume(TokenType.TokRightBracket, "Expect a ']' at the end of an attribute")
     this.ignoreNewlines()
@@ -1290,12 +1283,12 @@ class Parser {
     var expr: Expr = this.and()
 
     while (this.matches([ TokenType.TokBoolOr ])) {
-      var op: Token = this.previous()
+      var op = this.previous().lexeme
       this.ignoreNewlines();
       var right: Expr = this.and()
 
       expr = Expr(
-        expr: ExprDef.ELogical(expr, op.lexeme, right),
+        expr: ExprDef.ELogical(expr, op, right),
         pos: expr.pos.merge(right.pos)
       )
     }
@@ -1329,7 +1322,7 @@ class Parser {
       var right: Expr = this.comparison()
       
       expr = Expr(
-        expr: ExprDef.EBinary(expr, op.lexeme, right),
+        expr: ExprDef.EBinary(expr, op.type, right),
         pos: expr.pos.merge(right.pos)
       )
     }
@@ -1515,8 +1508,8 @@ class Parser {
           
           match (def) {
             EVariable(_) -> {
-              ret = ExprDef.Expr(
-                expr: EGrouping(ret),
+              ret = Expr(
+                expr: ExprDef.EGrouping(ret),
                 pos: ret.pos 
               )
             }

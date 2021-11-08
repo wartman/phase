@@ -14,6 +14,8 @@ interface Array
 
   public function find($elt):mixed;
 
+  public function exists($elt):Bool;
+
   public function map($transform):\Std\PhaseArray;
 
   public function contains($item):Bool;

@@ -1,6 +1,7 @@
 <?php
 namespace Phase\Language {
 
+  use Std\Io\Path;
 
   class TypePath
   {
@@ -12,10 +13,20 @@ namespace Phase\Language {
       $this->params = $params;
       $this->name = $name;
       $this->ns = $ns;
-      if ($this->params == null)
+      if ($this->params === null)
       {
         $this->params = new \Std\PhaseArray([]);
       }
+    }
+
+    static public function of(string $str)
+    {
+      $parts = (new \Std\PhaseString($str))->split("::")->filter(function (string $it)
+      {
+        return $it !== null && (new \Std\PhaseString($it))->length > 0;
+      });
+      $name = $parts->pop();
+      return new TypePath(ns: $parts, name: $name);
     }
 
     public \Std\PhaseArray $ns;
@@ -39,7 +50,7 @@ namespace Phase\Language {
       {
         $path = "?" . ($path) . "";
       }
-      if ($this->params != null && $this->params->length > 0)
+      if ($this->params !== null && $this->params->length > 0)
       {
         return "" . ($path) . "<" . ($this->params->map(function ($it = null)
         {
@@ -47,6 +58,18 @@ namespace Phase\Language {
         })->join(", ")) . ">";
       }
       return $path;
+    }
+
+    public function toFileName():string
+    {
+      return Path::join($this->ns)->with($this->name)->normalized()->toString();
+    }
+
+    public function notAbsolute():TypePath
+    {
+      $tp = clone($this);
+      $tp->isAbsolute = false;
+      return $tp;
     }
 
   }

@@ -2,6 +2,7 @@
 namespace Phase {
 
   use Phase\Language\Type;
+  use Phase\Language\TypePath;
 
   class Context
   {
@@ -10,7 +11,7 @@ namespace Phase {
     {
       $this->types = $types;
       $this->loader = $loader;
-      if ($this->types == null)
+      if ($this->types === null)
       {
         $this->types = new \Std\PhaseMap();
       }
@@ -35,8 +36,8 @@ namespace Phase {
       {
         return $this->types->get($name);
       }
-      $type = $this->loader->load($name);
-      if ($type != null)
+      $type = $this->loader->load(TypePath::of($name));
+      if ($type !== null)
       {
         $this->types->set($name, $type);
         return $type;
@@ -46,7 +47,7 @@ namespace Phase {
 
     public function unify(Type $a, Type $b)
     {
-      return $a == $b;
+      return $a === $b;
     }
 
   }

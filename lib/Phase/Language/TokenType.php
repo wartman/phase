@@ -61,11 +61,11 @@ namespace Phase\Language {
 
     const TokBang = "!";
 
-    const TokBangEqual = "!=";
+    const TokBangEqual = "!==";
 
     const TokEqual = "=";
 
-    const TokBoolEqual = "==";
+    const TokBoolEqual = "===";
 
     const TokGreater = ">";
 

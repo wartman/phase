@@ -25,11 +25,15 @@ $scanner = new \Phase\Scanner($source, $reporter);
 $parser = new \Phase\Parser($scanner->scan(), $reporter);
 $stmts = $parser->parse();
 $typer = new \Phase\Typer($stmts, $reporter);
-$types = $typer->typeSurface();
+$types = $typer->type();
 $generator = new \Phase\Generator\PhpGenerator(
   new \Phase\Generator\PhpGeneratorConfig(phpVersion: 8),
-  new \Phase\Context(new \Phase\TypeLoader(__DIR__), $types),
+  new \Phase\Context(new \Phase\TypeLoader(__DIR__.'/std'), $types),
   $stmts,
   $reporter
 );
-print_r($generator->generate());
+file_put_contents(
+  __DIR__ . '/dist/Scanner.php',
+  $generator->generate()
+);
+// print_r($generator->generate());

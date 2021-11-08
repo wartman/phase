@@ -5,12 +5,11 @@ namespace Phase\Language {
   class Field
   {
 
-    public function __construct(string $name, FieldKind $kind, ?TypePath $type, \Std\PhaseArray $access, \Std\PhaseArray $attributes, Position $pos)
+    public function __construct(string $name, FieldKind $kind, \Std\PhaseArray $access, \Std\PhaseArray $attributes, Position $pos)
     {
       $this->pos = $pos;
       $this->attributes = $attributes;
       $this->access = $access;
-      $this->type = $type;
       $this->kind = $kind;
       $this->name = $name;
     }
@@ -18,8 +17,6 @@ namespace Phase\Language {
     public string $name;
 
     public FieldKind $kind;
-
-    public ?TypePath $type;
 
     public \Std\PhaseArray $access;
 

@@ -4,8 +4,8 @@ use Phase::Language::{ Type }
 
 class Scope {
   new(
-    this.values: ?Map<String, Type> = null,
     this.parent: ?Scope = null,
+    this.values: ?Map<String, Type> = null,
     this.children: ?Array<Scope> = null
   ) {
     if (this.values == null) this.values = Map()
@@ -28,9 +28,9 @@ class Scope {
       return this.values[name]
     }
     if (this.parent != null) {
-      return this.parent[name]
+      return this.parent.resolve(name)
     }
-    return Type.TUnknown()
+    return Type.TUnknown(null)
   }
 
   addChild(child: Scope) {

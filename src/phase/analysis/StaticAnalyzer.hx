@@ -398,7 +398,8 @@ class StaticAnalyzer
     if (!scope.isDeclared(expr.name.lexeme)) {
       throw error(expr.name, 'Invalid assignment');
     }
-    setType(expr, scope.resolve(expr.name.lexeme));
+    expr.value.accept(this);
+    setType(expr, resolveType(expr.value));
   }
 
   public function visitIsExpr(expr:Expr.Is):Void {
@@ -474,15 +475,21 @@ class StaticAnalyzer
   }
 
   public function visitSetExpr(expr:Expr.Set):Void {
+    expr.value.accept(this);
     setType(expr, TVoid);
   }
 
   public function visitSubscriptGetExpr(expr:Expr.SubscriptGet):Void {
-    // todo
+    expr.object.accept(this);
+    if (expr.index != null) expr.index.accept(this);
+    // todo: we'll have to resolve from the type
+    setType(expr, TUnknown);
   }
 
   public function visitSubscriptSetExpr(expr:Expr.SubscriptSet):Void {
-    // todo
+    expr.object.accept(this);
+    expr.value.accept(this);
+    setType(expr, TVoid);
   }
 
   public function visitGroupingExpr(expr:Expr.Grouping):Void {

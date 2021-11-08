@@ -19,7 +19,7 @@ namespace Std {
 
     public function add(?string $value):StringBuf
     {
-      if ($value == null)
+      if ($value === null)
       {
         return $this;
       }

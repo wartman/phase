@@ -6,24 +6,24 @@ namespace Phase {
   class Scope
   {
 
-    public function __construct(?\Std\PhaseMap $values = null, ?Scope $parent = null, ?\Std\PhaseArray $children = null)
+    public function __construct(?Scope $parent = null, ?\Std\PhaseMap $values = null, ?\Std\PhaseArray $children = null)
     {
       $this->children = $children;
-      $this->parent = $parent;
       $this->values = $values;
-      if ($this->values == null)
+      $this->parent = $parent;
+      if ($this->values === null)
       {
         $this->values = new \Std\PhaseMap();
       }
-      if ($this->children == null)
+      if ($this->children === null)
       {
         $this->children = new \Std\PhaseArray([]);
       }
     }
 
-    public ?\Std\PhaseMap $values;
-
     public ?Scope $parent;
+
+    public ?\Std\PhaseMap $values;
 
     public ?\Std\PhaseArray $children;
 
@@ -34,7 +34,7 @@ namespace Phase {
 
     public function isDeclared(string $name):Bool
     {
-      if (!(isset($this->values[$name])) && $this->parent != null)
+      if (!(isset($this->values[$name])) && $this->parent !== null)
       {
         return $this->parent->isDeclared($name);
       }
@@ -47,11 +47,11 @@ namespace Phase {
       {
         return $this->values[$name];
       }
-      if ($this->parent != null)
+      if ($this->parent !== null)
       {
-        return $this->parent[$name];
+        return $this->parent->resolve($name);
       }
-      return Type::TUnknown();
+      return Type::TUnknown(null);
     }
 
     public function addChild(Scope $child)

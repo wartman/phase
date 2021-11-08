@@ -1,6 +1,18 @@
 namespace Phase::Language
 
+use Std::Io::Path
+
 class TypePath {
+  static of(str: String) {
+    var parts = str.split('::').filter { |it:String| it != null && it.length > 0 }
+    var name = parts.pop()
+    // todo: params
+    return TypePath(
+      ns: parts,
+      name: name
+    )
+  }
+
   new(
     this.ns: Array<String>,
     this.name: String,
@@ -23,5 +35,19 @@ class TypePath {
       return '${path}<${ this.params.map { it.toString() }.join(', ') }>'
     }
     return path
+  }
+
+  toFileName(): String {
+    return Path
+      .join(this.ns)
+      .with(this.name)
+      .normalized()
+      .toString()
+  }
+
+  notAbsolute(): TypePath {
+    var tp = this |> clone()
+    tp.isAbsolute = false
+    return tp
   }
 }

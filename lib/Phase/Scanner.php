@@ -174,7 +174,7 @@ namespace Phase {
         case "/":
           if ($this->matches("/"))
           {
-            while ($this->peek() != "\n" && !$this->isAtEnd())
+            while ($this->peek() !== "\n" && !$this->isAtEnd())
             {
               $this->advance();
             }
@@ -254,7 +254,7 @@ namespace Phase {
 
     protected function newline()
     {
-      while ($this->peek() == "\n" && !$this->isAtEnd())
+      while ($this->peek() === "\n" && !$this->isAtEnd())
       {
         $this->advance();
       }
@@ -274,11 +274,11 @@ namespace Phase {
       $this->advance();
       $text = $this->getText();
       $type = isset(static::$keywords[$text]) ? static::$keywords[$text] : null;
-      if (($this->peek() == "\"" || $this->peek() == "'") && $type == null)
+      if (($this->peek() === "\"" || $this->peek() === "'") && $type === null)
       {
         $type = TokenType::TokTemplateTag;
       }
-      if ($type != null)
+      if ($type !== null)
       {
         $this->addToken($type);
       }
@@ -290,9 +290,9 @@ namespace Phase {
 
     protected function string(string $quote = "\"", int $depth = 0)
     {
-      while ($this->peek() != $quote && !$this->isAtEnd())
+      while ($this->peek() !== $quote && !$this->isAtEnd())
       {
-        if ($this->peek() == "$" && $this->peekNext() == "{")
+        if ($this->peek() === "$" && $this->peekNext() === "{")
         {
           $this->addToken(TokenType::TokInterpolation, $this->getText());
           $this->advance();
@@ -327,11 +327,11 @@ namespace Phase {
       {
         $this->start = $this->end;
         $this->scanToken();
-        if ($this->peek() == "{")
+        if ($this->peek() === "{")
         {
           $brackets = $brackets + 1;
         }
-        if ($this->peek() == "}")
+        if ($this->peek() === "}")
         {
           $brackets = $brackets - 1;
         }
@@ -347,7 +347,7 @@ namespace Phase {
       {
         $this->advance();
       }
-      if ($this->peek() == "." && $this->isDigit($this->peekNext()))
+      if ($this->peek() === "." && $this->isDigit($this->peekNext()))
       {
         $this->advance();
         while ($this->isDigit($this->peek()) && !$this->isAtEnd())
@@ -365,7 +365,7 @@ namespace Phase {
 
     protected function isAlpha(string $c):Bool
     {
-      return ($c >= "a" && $c <= "z") || ($c >= "A" && $c <= "Z") || $c == "_";
+      return ($c >= "a" && $c <= "z") || ($c >= "A" && $c <= "Z") || $c === "_";
     }
 
     public function isUcAlpha(string $c):Bool
@@ -389,7 +389,7 @@ namespace Phase {
       {
         return false;
       }
-      if ($this->source->content[$this->end] != $expected)
+      if ($this->source->content[$this->end] !== $expected)
       {
         return false;
       }

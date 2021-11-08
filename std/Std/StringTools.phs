@@ -1,0 +1,60 @@
+namespace Std
+
+class StringTools {
+  static charAt(subject: String, index: Int): String {
+    if (index < 0) {
+      return ''
+    }
+    return mb_substr(subject, index, 1)
+  }
+
+  static indexOf(subject: String, search: String, startIndex: ?Int = null): Int {
+    if (startIndex == null) {
+      startIndex = 0
+    } else {
+      var length = subject.length
+      if (startIndex < 0) {
+        startIndex = startIndex + length
+        if (startIndex < 0) {
+          startIndex = 0
+        }
+      }
+      if (startIndex >= length && search == '') {
+        return -1
+      }
+    }
+    var index = if (search == '')
+      if (startIndex > subject.length) subject.length else startIndex
+    else
+      mb_strpos(subject, search, startIndex)
+    
+    return if (index == false) -1 else index
+  }
+
+  static lastIndexOf(subject: String, search: String, startIndex: ?Int = null): Int {
+    var start = startIndex
+    if (start == null) {
+      start = 0
+    } else {
+      var length = subject.length
+      if (start >= 0) {
+        start = start - length
+        if (start > 0) {
+          start = 0
+        }
+      } else if (start < -length) {
+        start = -length
+      }
+    }
+    var index = if (search == '')
+      if (startIndex == null || startIndex > subject.length) subject.length else startIndex
+    else
+      mb_strpos(subject, search, start)
+
+    if (index == false) {
+      return -1
+    } else {
+      return index
+    }
+  }
+}

@@ -1,0 +1,149 @@
+namespace Std::Io
+
+use Std::StringTools
+
+class Path {
+  static of(subject: String) {
+    return Path(subject)
+  }
+
+  static join(parts: Array<String>): Path {
+    var paths = parts.filter { it != null && it != '' }
+    if (paths.length == 0) {
+      return Path('')
+    }
+    var path = paths[0]
+    for (i in 1..paths.length) {
+      path = static.addTrailingSlash(path)
+      path = path +++ paths[i]
+    }
+    return (Path(path)).normalized()
+  }
+
+  static addTrailingSlash(path: String): String {
+    if (path.length == 0) {
+      return "/"
+    }
+    var c1 = StringTools.lastIndexOf(path, "/")
+    var c2 = StringTools.lastIndexOf(path, "\\")
+    if (c1 < c2) {
+      if (c2 != path.length - 1) {
+        return path +++ "\\"
+      }
+      return path
+    } else {
+      if (c1 != path.length - 1) {
+        return path +++ "/"
+      }
+      return path
+    }
+  }
+
+  /// The directory.
+  dir: ?String
+
+  /// The file name.
+  file: String
+
+  /// The file extension. May be null.
+  ext: ?String
+
+  /// Using a backslash as a sep.
+  backslash: Bool = false
+
+  new(path: String) {
+    if (path == '.' || path == '..') {
+      this.dir = path
+      this.file = ''
+      return
+    }
+    var c1 = StringTools.lastIndexOf(path, "/")
+    var c2 = StringTools.lastIndexOf(path, "\\")
+    if (c1 < c2) {
+      this.dir = path.substr(0, c2)
+      path = path.substr(c2 + 1)
+      this.backslash = true
+    } else if (c2 < c1) {
+      this.dir = path.substr(0, c1)
+      path = path.substr(c1 + 1)
+    } else {
+      this.dir = null
+    }
+    var cp = StringTools.lastIndexOf(path, ".")
+    if (cp != -1) {
+      this.ext = path.substr(cp + 1)
+      this.file = path.substr(0, cp)
+    } else {
+      this.ext = null
+      this.file = path
+    }
+  }
+
+  with(part: String): Path {
+    return Path.join([ this.toString(), part ])
+  }
+
+  toString(): String { this.__toString() }
+
+  __toString(): String {
+    var slash = if (this.backslash) "\\" else "/"
+    var dir = if (this.dir == null) "" else '${this.dir}${slash}'
+    var ext = if (this.ext == null) "" else ".${this.ext}"
+    return "${dir}${this.file}${ext}"
+  }
+
+  withoutExtension(): Path {
+    var path = this |> clone()
+    path.ext = null
+    return path
+  }
+
+  withoutDirectory(): Path {
+    var path = this |> clone()
+    path.dir = null
+    return path
+  }
+
+  getDirectory(): String {
+    return if (this.dir == null) "" else this.dir
+  }
+  
+  getExtension(): String {
+    return if (this.ext == null) "" else this.ext
+  }
+
+  withExtension(ext: String): Path {
+    var path = this |> clone()
+    path.ext = ext
+    return path
+  }
+
+  normalized(): Path {
+    var slash = "/"
+    var path = this.toString().split("\\").join(slash)
+    
+    if (path == slash) {
+      return Path(slash)
+    }
+    
+    var target = []
+
+    for (token in path.split(slash)) {
+      if (
+        token == '..' 
+        && target.length > 0
+        && target[target.length - 1] != '..'
+      ) {
+        target.pop()
+      } else if (token == '') {
+        if (target.length > 0 || StringTools.charAt(path, 0) == '/') {
+          target.push(token)
+        }
+      } else if (token != '.') {
+        target.push(token)
+      }
+    }
+
+    return Path(target.join(slash))
+  }
+}

@@ -83,10 +83,15 @@ namespace Std {
       return $this->indexOf($item) > -1;
     }
 
+    public function exists($elt):Bool
+    {
+      return $this->find($elt) !== null;
+    }
+
     public function indexOf($item):int
     {
       $index = array_search($item, $this->data, true);
-      return $index == false ? -1 : $index;
+      return $index === false ? -1 : $index;
     }
 
     public function remove($item):Bool
@@ -94,7 +99,7 @@ namespace Std {
       $removed = false;
       for ($index = 0; $index < $this->length; $index++)
       {
-        if ($this->data[$index] == $item)
+        if ($this->data[$index] === $item)
         {
           array_splice($this->data, $index, 1);
           $removed = true;
@@ -139,7 +144,7 @@ namespace Std {
       {
         $pos = 0;
       }
-      if ($end == null)
+      if ($end === null)
       {
         return array_slice($this->data, $pos);
       }
@@ -198,7 +203,7 @@ namespace Std {
 
     public function offsetSet($offset, $value)
     {
-      if ($offset == null)
+      if ($offset === null)
       {
         $this->data[] = $value;
       }

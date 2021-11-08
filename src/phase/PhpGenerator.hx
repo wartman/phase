@@ -800,6 +800,8 @@ class PhpGenerator
   public function visitBinaryExpr(expr:Expr.Binary):String {
     var op = switch expr.op.type {
       case TokConcat: '.';
+      case TokBoolEqual: '===';
+      case TokBangEqual: '!==';
       default: expr.op.lexeme;
     }
     return generateExpr(expr.left) + ' ' + op + ' ' + generateExpr(expr.right);
